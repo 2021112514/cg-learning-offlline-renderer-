@@ -1,0 +1,13 @@
+<Settings>
+    <Screen>
+        <W>640</W>
+        <H>480</H>
+    </Screen>
+    <Render>
+        <SSAASampleTimes>2</SSAASampleTimes>
+        <MonteCarloIntegrationSampleTimes>64</MonteCarloIntegrationSampleTimes>
+        <MinReflectionTime>1</MinReflectionTime>
+        <MaxReflectionTime>1</MaxReflectionTime>
+        <ReflectionProbably>0.8</ReflectionProbably>
+    </Render>
+</Settings>
