@@ -12,5 +12,6 @@ from .transform import (
     view_transform,
     projection,
     viewport,
-    build_coordinate_system
+    build_coordinate_system,
+    get_refractor_vector
 )

@@ -2,8 +2,8 @@ from device import np, Array
 from ray import Ray
 from scene import Scene
 from settings.settings import Settings
-from transform import normalize, build_coordinate_system
-from material import Specular
+from transform import normalize, build_coordinate_system, get_refractor_vector
+from material import DielectricSpecular
 
 
 class Renderer:
@@ -47,7 +47,7 @@ class Renderer:
         object_index_selected = object_index[selected]
         material_index_selected = self.scene.object_material_index_map[object_index_selected]
         num_material = int(material_index_selected.max() + 1)
-        is_specular = self.scene.object_is_specular_or_not[object_index_selected]
+        is_specular = self.scene.object_is_specular[object_index_selected]
         not_specular = np.logical_not(is_specular)
         pos_not_specular = pos_selected[:, not_specular]
         material_index_not_specular = material_index_selected[not_specular]
@@ -108,19 +108,52 @@ class Renderer:
         color[:, idx_selected[not_specular]] += np.pi ** 2 * color_sum / self.settings.render.monte_carlo_integration_sampling_times
         # 镜面材质，渲染方程的曲面积分退化为单入射方向
         wi = wo_local[:, is_specular] * np.array([[-1.0], [-1.0], [1.0]])
-        brdf = np.full((3, N_specular), 0.0)
+        brdf = np.zeros((3, N_specular))
         for material_id in range(num_material):
             material = self.scene.materials[material_id]
             mask = material_index_specular == material_id
             brdf[:, mask] = material.brdf(wo_local[:, is_specular][:, mask], wi[:, mask])
-        direction_wi_global = (coord_transform_inv[is_specular, :, :].transpose((1, 2, 0)) * wi).sum(axis=1)
+        direction_wi_global = np.sum(coord_transform_inv[is_specular, :, :].transpose((1, 2, 0)) * wi, axis=1)
         ray = Ray(
             direction=direction_wi_global,
             pos=pos_selected[:, is_specular],
             min_t=np.broadcast_to(min_t, N_specular),
             max_t=np.broadcast_to(max_t_inf, N_specular)
         )
-        cos_theta = np.clip(wi[-1, :], a_min=0.0, a_max=1.0)
+        cos_theta = np.abs(wi[-1, :])
         color_ = brdf * self._compute_radiance(ray, depth + 1) * cos_theta
         color[:, idx_selected[is_specular]] += color_
+        # 折射
+        is_refractable = self.scene.object_is_refractable[object_index_selected]
+        N_refractable = int(np.sum(is_refractable))
+        if N_refractable > 0:
+            btdf = np.zeros((3, N_refractable))
+            material_index_refractable = material_index_selected[is_refractable]
+            wi = wo_local[:, is_refractable]
+            arange_refractable = np.arange(material_index_refractable.shape[0])
+            idx_refractable_in_selected = np.arange(idx_selected.shape[0])[is_refractable]
+            not_full_refractor = np.full_like(idx_refractable_in_selected, False, dtype=bool)
+            wt_local = np.zeros_like(wi)
+            for material_id in range(num_material):
+                material = self.scene.materials[material_id]
+                mask = arange_refractable[material_index_refractable == material_id]
+                if mask.shape[0] > 0:
+                    assert isinstance(material, DielectricSpecular)
+                    eta = np.where(wi[-1, mask] > 0, 1 / material.eta, material.eta)
+                    wt, refractor = get_refractor_vector(wi[:, mask], eta)
+                    wt_local[:, mask[refractor]] = wt
+                    not_full_refractor[mask[refractor]] = True
+                    btdf[:, mask[refractor]] = material.btdf(wi[:, mask[refractor]], wt) # BTDF调用时的参数顺序问题见教程第11讲46分处
+            idx_not_full_refractor_in_selected = idx_refractable_in_selected[not_full_refractor]
+            wt_global = np.sum(coord_transform_inv[idx_not_full_refractor_in_selected].transpose((1, 2, 0)) * wt_local[:, not_full_refractor], axis=1)
+            if idx_not_full_refractor_in_selected.shape[0] > 0:
+                ray = Ray(
+                    direction=wt_global,
+                    pos=pos_selected[:, idx_not_full_refractor_in_selected],
+                    min_t=np.broadcast_to(min_t, idx_not_full_refractor_in_selected.shape[0]),
+                    max_t=np.broadcast_to(max_t_inf, idx_not_full_refractor_in_selected.shape[0])
+                )
+                cos_theta = wi[:, not_full_refractor][-1, :]
+                color_ = btdf[:, not_full_refractor] * self._compute_radiance(ray, depth + 1) * np.abs(cos_theta)
+                color[:, idx_selected[idx_not_full_refractor_in_selected]] += color_
         return color / factor

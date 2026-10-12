@@ -5,7 +5,7 @@ from .scene_object import SceneObject
 from material import *
 from ray import Ray, PerspectiveCamera
 from light import Light
-from material import Specular
+from material import Specular, DielectricSpecular
 from parser import tag, XMLHandler
 
 
@@ -25,9 +25,11 @@ class Scene:
         material_map = {
             m.name: i for i, m in enumerate(self.materials)
         }
-        material_is_specular_or_not = [isinstance(m, Specular) for m in materials]
+        material_is_specular = [isinstance(m, Specular) for m in materials]
+        material_is_refractable = [isinstance(m, DielectricSpecular) for m in materials]
         self.object_material_index_map = np.array([material_map[obj.material] for obj in self.objects])
-        self.object_is_specular_or_not = np.array([material_is_specular_or_not[material_map[obj.material]] for obj in self.objects])
+        self.object_is_specular = np.array([material_is_specular[material_map[obj.material]] for obj in self.objects])
+        self.object_is_refractable = np.array([material_is_refractable[material_map[obj.material]] for obj in self.objects])
 
     def intersect(self, ray: Ray) -> Tuple[Array, Array, Array, Array]:
         """

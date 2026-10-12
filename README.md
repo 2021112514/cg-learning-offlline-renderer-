@@ -12,3 +12,5 @@ python -m run --scene '<scene>' --config '<config>'
 ![](./assets/scene09.png)
 ### 镜面材质
 ![](./assets/scene10.png)
+### 折射
+![](./assets/scene11_1.png)

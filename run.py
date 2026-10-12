@@ -10,7 +10,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--scene', type=str, help='path of scene xml file')
 parser.add_argument('--config', type=str, default='./conf/settings.xml', help='path of config xml file')
 args = parser.parse_args()
-scene_xml = args.scene
+scene_xml: str = args.scene
 conf = args.config
 settings = get_settings(conf)
 if __name__ == '__main__':
@@ -20,6 +20,7 @@ if __name__ == '__main__':
     render = Renderer(scene, settings)
     color = asnumpy(render.render())
     screen = pygame.display.set_mode((W, H))
+    pygame.display.set_caption(scene_xml.split('\\')[-1].split('/')[-1].removesuffix('.xml'))
     clock = pygame.time.Clock()
     buffer_surface = pygame.Surface((W, H))
     running = True

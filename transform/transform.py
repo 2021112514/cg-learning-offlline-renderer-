@@ -232,3 +232,25 @@ def build_coordinate_system(z: Array) -> Tuple[Array, Array]:
     matrix = inv.transpose((0, 2, 1))
     return matrix, inv
 
+
+def get_refractor_vector(wi: Array, eta_i_div_eta_t: Array) -> Tuple[Array, Array]:
+    """
+    计算折射方向向量
+    Args:
+        wi(Array): [3, N]，入射方向向量
+        eta_i_div_eta_t: [N] 或 [1]，eta_i / eta_t
+    Returns:
+        refractor_vector(Array): [3, N_not_full_refractor]，折射光线方向（**仅返回未发生全反射的方向**）
+        not_full_refractor(Array): [3, N]，是否发生折射
+    """
+    cos_i = wi[2, :]
+    sin_i = np.sqrt(1 - cos_i ** 2)
+    sin_t = sin_i * eta_i_div_eta_t
+    not_full_refractor = sin_t < 1
+    cos_i = cos_i[not_full_refractor]
+    sin_i = sin_i[not_full_refractor]
+    sin_t = sin_t[not_full_refractor]
+    cos_t = np.sqrt(1 - sin_t ** 2)
+    sin_t_i = -sin_t / np.clip(sin_i, a_min=1e-6, a_max=1.0)
+    refractor_vector = np.concat([wi[:2, not_full_refractor] * sin_t_i, (cos_t * ((cos_i <= 0) * 2 - 1))[None, :]], axis=0)
+    return refractor_vector, not_full_refractor
