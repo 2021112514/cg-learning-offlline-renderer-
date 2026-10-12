@@ -4,8 +4,8 @@
         <H>480</H>
     </Screen>
     <Render>
-        <SSAASampleTimes>2</SSAASampleTimes>
-        <MonteCarloIntegrationSampleTimes>64</MonteCarloIntegrationSampleTimes>
+        <SSAASampleTimes>4</SSAASampleTimes>
+        <MonteCarloIntegrationSamplingTimes>64</MonteCarloIntegrationSamplingTimes>
         <MinReflectionTime>1</MinReflectionTime>
         <MaxReflectionTime>1</MaxReflectionTime>
         <ReflectionProbably>0.8</ReflectionProbably>

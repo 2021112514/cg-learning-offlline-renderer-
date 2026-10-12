@@ -1,5 +1,6 @@
 from .material import Material
 from .lambert import Lambert
+from .specular import *
 from parser import tag_constructor
 
 

@@ -9,4 +9,6 @@ python -m run --scene '<scene>' --config '<config>'
 ```
 ## 效果
 ### 间接光照
-![alt text](./assets/scene09.png)
+![](./assets/scene09.png)
+### 镜面材质
+![](./assets/scene10.png)

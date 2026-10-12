@@ -14,7 +14,7 @@ class Screen:
 @tag()
 class Render:
     ssaa_sample_times: int = 0
-    monte_carlo_integration_sample_times: int = 8
+    monte_carlo_integration_sampling_times: int = 8
     min_reflection_time: int = 1
     max_reflection_time: int = 2
     reflection_probably: float = 0.8
