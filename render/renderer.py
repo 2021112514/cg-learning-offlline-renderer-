@@ -1,5 +1,7 @@
+import math
+from tqdm import tqdm
 from device import np, Array
-from ray import Ray
+from ray import Ray, PerspectiveCamera
 from scene import Scene
 from settings.settings import Settings
 from transform import normalize, build_coordinate_system, get_refractor_vector
@@ -13,11 +15,36 @@ class Renderer:
         
 
     def render(self) -> Array:
-        color = self._compute_radiance(self.scene.camera)
-        if self.scene.camera.sample_times > 0:
-            color = color.reshape((3, self.scene.camera.sample_times, -1)).mean(axis=1)
-        color = np.array(np.clip(color * 255, a_min=0.0, a_max=255.0), dtype=np.uint8)
-        return color.reshape((3, self.scene.camera.H, self.scene.camera.W)).transpose(2, 1, 0)
+        # 按SSAA采样对点进行分片，减少显存压力
+        with tqdm(total=self.settings.render.split) as pbar:
+            pbar.set_description('Rendering slices')
+            color_sum = np.zeros((self.scene.camera.W, self.scene.camera.H, 3))
+            camera = self.scene.camera
+            color = self._compute_radiance(camera)
+            pbar.update(1)
+            if camera.sample_times > 0:
+                color = color.reshape((3, camera.sample_times, -1)).sum(axis=1)
+            color_sum += color.reshape((3, self.scene.camera.H, self.scene.camera.W)).transpose(2, 1, 0)
+            max_sampling_times = math.ceil(self.settings.render.ssaa_sampling_times / self.settings.render.split)
+            sampling_times_used = max_sampling_times
+            for _ in range(1, self.settings.render.split):
+                times = min(self.settings.render.ssaa_sampling_times - sampling_times_used, max_sampling_times)
+                camera = PerspectiveCamera(
+                    position=self.scene.camera.position,
+                    target=self.scene.camera.target,
+                    up=self.scene.camera.up,
+                    fov=self.scene.camera.fov,
+                    near_z=self.scene.camera.near_z,
+                    far_z=self.scene.camera.far_z,
+                    sample_times=times
+                )
+                sampling_times_used += times
+                color = self._compute_radiance(camera)
+                pbar.update(1)
+                if camera.sample_times > 0:
+                    color = color.reshape((3, camera.sample_times, -1)).sum(axis=1)
+                color_sum += color.reshape((3, self.scene.camera.H, self.scene.camera.W)).transpose(2, 1, 0)
+        return np.array(np.clip((color_sum / self.settings.render.ssaa_sampling_times) * 255, a_min=0.0, a_max=255.0), dtype=np.uint8)
 
     def _compute_radiance(self, ray: Ray, depth: int=0) -> Array:
         color = np.zeros_like(ray.direction)
@@ -84,18 +111,17 @@ class Renderer:
         color_sum = np.full((3, N_not_specular), 0.0)
         # 非镜面材质，采用 Monte Carlo 积分求解渲染方程
         for _ in range(self.settings.render.monte_carlo_integration_sampling_times):
-            theta = np.random.rand(N_not_specular) * np.pi * 0.5
-            phi = np.random.rand(N_not_specular) * np.pi * 2
-            sin_theta = np.sin(theta)
-            cos_theta = np.cos(theta)
-            sin_phi = np.sin(phi)
-            cos_phi = np.cos(phi)
-            wi = np.stack([sin_theta * cos_phi, sin_theta * sin_phi, cos_theta], axis=0)
+            wi = np.zeros((3, N_not_specular))
+            pdf = np.ones(N_not_specular)
             brdf = np.full((3, N_not_specular), 0.0)
             for material_id in range(num_material):
                 material = self.scene.materials[material_id]
                 mask = material_index_not_specular == material_id
-                brdf[:, mask] = material.brdf(wo_local[:, not_specular][:, mask], wi[:, mask])
+                if int(np.sum(mask)) > 0:
+                    sampled_wi, sampled_pdf = material.sample_wi(wo_local[:, not_specular][:, mask])
+                    wi[:, mask] = sampled_wi
+                    pdf[mask] = sampled_pdf
+                    brdf[:, mask] = material.brdf(wo_local[:, not_specular][:, mask], wi[:, mask])
             direction_wi_global = (coord_transform_inv[not_specular, :, :].transpose((1, 2, 0)) * wi).sum(axis=1)
             ray = Ray(
                 direction=direction_wi_global,
@@ -103,9 +129,9 @@ class Renderer:
                 min_t=np.broadcast_to(min_t, N_not_specular),
                 max_t=np.broadcast_to(max_t_inf, N_not_specular)
             )
-            color_ = brdf * self._compute_radiance(ray, depth + 1) * cos_theta * sin_theta
+            color_ = brdf * self._compute_radiance(ray, depth + 1) * wi[-1, :] / pdf
             color_sum += color_
-        color[:, idx_selected[not_specular]] += np.pi ** 2 * color_sum / self.settings.render.monte_carlo_integration_sampling_times
+        color[:, idx_selected[not_specular]] += color_sum / self.settings.render.monte_carlo_integration_sampling_times
         # 镜面材质，渲染方程的曲面积分退化为单入射方向
         wi = wo_local[:, is_specular] * np.array([[-1.0], [-1.0], [1.0]])
         brdf = np.zeros((3, N_specular))
@@ -153,7 +179,7 @@ class Renderer:
                     min_t=np.broadcast_to(min_t, idx_not_full_refractor_in_selected.shape[0]),
                     max_t=np.broadcast_to(max_t_inf, idx_not_full_refractor_in_selected.shape[0])
                 )
-                cos_theta = wi[:, not_full_refractor][-1, :]
+                cos_theta = wt_local[:, not_full_refractor][-1, :]
                 color_ = btdf[:, not_full_refractor] * self._compute_radiance(ray, depth + 1) * np.abs(cos_theta)
                 color[:, idx_selected[idx_not_full_refractor_in_selected]] += color_
         return color / factor

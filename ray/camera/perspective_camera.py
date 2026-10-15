@@ -1,5 +1,6 @@
+import math
 from device import np, Array
-from typing import Tuple
+from typing import Tuple, Optional
 from transform import view_transform, projection, viewport, normalize, normalize_homogeneous
 from ..ray import Ray
 from parser import tag
@@ -14,12 +15,19 @@ class PerspectiveCamera(Ray):
         up: Tuple[float, float, float],
         fov: float,
         near_z: float,
-        far_z: float
+        far_z: float,
+        sample_times: Optional[int] = None
     ):
         from run import settings
         self.W = settings.screen.w
         self.H = settings.screen.h
         alpha = self.W / self.H
+        self.position = position
+        self.target = target
+        self.up = up
+        self.fov = fov
+        self.near_z = near_z
+        self.far_z = far_z
         p = np.array(position)
         l = normalize(np.array(target) - p)
         r = np.cross(np.array(up), l)
@@ -34,7 +42,7 @@ class PerspectiveCamera(Ray):
         points = np.stack([X, Y], axis=-1).reshape(-1, 2).T + np.array([[0.5], [0.5]])
 
         # SSAA
-        self.sample_times = settings.render.ssaa_sample_times
+        self.sample_times = math.ceil(settings.render.ssaa_sampling_times / settings.render.split) if sample_times is None else sample_times
         if self.sample_times > 0:
             sample = np.random.rand(self.sample_times, 2)[..., None] - 0.5
             points = (sample + points).transpose((1, 0, 2)).reshape(2, -1)

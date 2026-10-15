@@ -4,10 +4,11 @@
         <H>460</H>
     </Screen>
     <Render>
-        <SSAASampleTimes>16</SSAASampleTimes>
-        <MonteCarloIntegrationSamplingTimes>3</MonteCarloIntegrationSamplingTimes>
+        <SSAASamplingTimes>512</SSAASamplingTimes>
+        <MonteCarloIntegrationSamplingTimes>1</MonteCarloIntegrationSamplingTimes>
         <MinReflectionTime>2</MinReflectionTime>
-        <MaxReflectionTime>2</MaxReflectionTime>
+        <MaxReflectionTime>3</MaxReflectionTime>
         <ReflectionProbably>0.8</ReflectionProbably>
+        <Split>64</Split>
     </Render>
 </Settings>
