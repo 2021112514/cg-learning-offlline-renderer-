@@ -1,7 +1,7 @@
 import math
 from device import np, Array
 from typing import Tuple, Optional
-from transform import view_transform, projection, viewport, normalize, normalize_homogeneous
+from common import view_transform, projection, viewport, normalize, normalize_homogeneous
 from ..ray import Ray
 from parser import tag
 

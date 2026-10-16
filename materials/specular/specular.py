@@ -1,4 +1,4 @@
-from material import Material
+from materials import Material
 
 
 class Specular(Material):

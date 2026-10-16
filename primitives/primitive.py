@@ -1,7 +1,7 @@
 from device import np, Array
 from typing import Tuple, Any
 from ray import Ray
-from transform import Transform, world_transform, normalize, expand0, expand1
+from common import Transform, world_transform, normalize, expand0, expand1
 from parser import tag
 
 

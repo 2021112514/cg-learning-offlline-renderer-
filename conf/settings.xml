@@ -7,7 +7,7 @@
         <SSAASamplingTimes>512</SSAASamplingTimes>
         <MonteCarloIntegrationSamplingTimes>1</MonteCarloIntegrationSamplingTimes>
         <MinReflectionTime>2</MinReflectionTime>
-        <MaxReflectionTime>3</MaxReflectionTime>
+        <MaxReflectionTime>4</MaxReflectionTime>
         <ReflectionProbably>0.8</ReflectionProbably>
         <Split>64</Split>
     </Render>

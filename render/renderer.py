@@ -1,17 +1,19 @@
 import math
 from tqdm import tqdm
-from device import np, Array
+from typing import Callable, Any, Optional
+from device import np, Array, asnumpy
 from ray import Ray, PerspectiveCamera
 from scene import Scene
 from settings.settings import Settings
-from transform import normalize, build_coordinate_system, get_refractor_vector
-from material import DielectricSpecular
+from common import normalize, build_coordinate_system, get_refractor_vector
+from materials import DielectricSpecular
 
 
 class Renderer:
-    def __init__(self, scene: Scene, settings: Settings):
+    def __init__(self, scene: Scene, settings: Settings, paint: Optional[Callable[[Array], Any]] = None):
         self.scene = scene
         self.settings = settings
+        self.paint = paint
         
 
     def render(self) -> Array:
@@ -25,17 +27,32 @@ class Renderer:
             if camera.sample_times > 0:
                 color = color.reshape((3, camera.sample_times, -1)).sum(axis=1)
             color_sum += color.reshape((3, self.scene.camera.H, self.scene.camera.W)).transpose(2, 1, 0)
+            result = np.array(
+                np.clip((color_sum / camera.sample_times if camera.sample_times > 0 else color_sum) * 255, a_min=0.0, a_max=255.0),
+                dtype=np.uint8
+            )
+            if self.paint is not None:
+                self.paint(asnumpy(result))
             max_sampling_times = math.ceil(self.settings.render.ssaa_sampling_times / self.settings.render.split)
             sampling_times_used = max_sampling_times
+            position=self.scene.camera.position
+            target=self.scene.camera.target
+            up=self.scene.camera.up
+            fov=self.scene.camera.fov
+            near_z=self.scene.camera.near_z
+            far_z=self.scene.camera.far_z
+            H = self.scene.camera.H
+            W = self.scene.camera.W
+            del self.scene.camera
             for _ in range(1, self.settings.render.split):
                 times = min(self.settings.render.ssaa_sampling_times - sampling_times_used, max_sampling_times)
                 camera = PerspectiveCamera(
-                    position=self.scene.camera.position,
-                    target=self.scene.camera.target,
-                    up=self.scene.camera.up,
-                    fov=self.scene.camera.fov,
-                    near_z=self.scene.camera.near_z,
-                    far_z=self.scene.camera.far_z,
+                    position=position,
+                    target=target,
+                    up=up,
+                    fov=fov,
+                    near_z=near_z,
+                    far_z=far_z,
                     sample_times=times
                 )
                 sampling_times_used += times
@@ -43,10 +60,13 @@ class Renderer:
                 pbar.update(1)
                 if camera.sample_times > 0:
                     color = color.reshape((3, camera.sample_times, -1)).sum(axis=1)
-                color_sum += color.reshape((3, self.scene.camera.H, self.scene.camera.W)).transpose(2, 1, 0)
-        return np.array(np.clip((color_sum / self.settings.render.ssaa_sampling_times) * 255, a_min=0.0, a_max=255.0), dtype=np.uint8)
+                color_sum += color.reshape((3, H, W)).transpose(2, 1, 0)
+                result = np.array(np.clip((color_sum / sampling_times_used) * 255, a_min=0.0, a_max=255.0), dtype=np.uint8)
+                if self.paint is not None:
+                    self.paint(asnumpy(result))
+        return result
 
-    def _compute_radiance(self, ray: Ray, depth: int=0) -> Array:
+    def _compute_radiance(self, ray: Ray, depth: int = 0) -> Array:
         color = np.zeros_like(ray.direction)
         t, pos, n, object_index = self.scene.intersect(ray)
         N = t.shape[0]

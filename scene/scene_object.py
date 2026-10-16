@@ -1,7 +1,7 @@
 from device import np, Array
 from typing import List, Tuple
 from primitives import Primitive
-from transform import Transform, identity_transform, world_transform
+from common import Transform, identity_transform, world_transform
 from ray import Ray
 from parser import tag
 

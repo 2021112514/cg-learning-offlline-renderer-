@@ -1,6 +1,6 @@
 from typing import Tuple
 from device import np, Array
-from transform import normalize
+from common import normalize
 from .light import Light
 from parser import tag
 

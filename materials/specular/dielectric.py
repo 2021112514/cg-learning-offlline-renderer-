@@ -1,6 +1,6 @@
 from typing import Tuple
 from .specular import Specular
-from transform import get_refractor_vector
+from common import get_refractor_vector
 from parser import tag
 from device import np, Array
 

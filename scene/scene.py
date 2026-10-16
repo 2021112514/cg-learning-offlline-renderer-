@@ -2,10 +2,10 @@ import xml.sax
 from device import np, Array
 from typing import List, Tuple
 from .scene_object import SceneObject
-from material import *
+from materials import *
 from ray import Ray, PerspectiveCamera
 from light import Light
-from material import Specular, DielectricSpecular
+from materials import Specular, DielectricSpecular
 from parser import tag, XMLHandler
 
 

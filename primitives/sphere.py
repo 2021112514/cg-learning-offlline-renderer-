@@ -1,7 +1,7 @@
 from device import np, Array
 from typing import Tuple
 from .primitive import Primitive
-from transform import Transform, identity_transform
+from common import Transform, identity_transform
 from parser import tag
 
 
