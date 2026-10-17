@@ -1,10 +1,10 @@
 import xml.sax
 from device import np, Array
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 from .scene_object import SceneObject
 from materials import *
 from ray import Ray, PerspectiveCamera
-from light import Light
+from lights import Light
 from materials import Specular, DielectricSpecular
 from parser import tag, XMLHandler
 
@@ -14,12 +14,16 @@ class Scene:
     def __init__(
         self,
         scene_objects: List[SceneObject],
-        lights: List[Light],
         camera: PerspectiveCamera,
-        materials: List[Material]
+        materials: List[Material],
+        lights: Optional[List[Light]] = None
     ):
-        self.objects = scene_objects
-        self.lights = lights
+        self.scene_objects = scene_objects
+        self.lights = lights if lights is not None else []
+        from lights import AreaLight
+        for obj in self.scene_objects:
+            if obj.emissive[0] > 0 or obj.emissive[1] > 0 or obj.emissive[2] > 0:
+                self.lights.append(AreaLight(obj))
         self.camera = camera
         self.materials = materials
         material_map = {
@@ -27,9 +31,9 @@ class Scene:
         }
         material_is_specular = [isinstance(m, Specular) for m in materials]
         material_is_refractable = [isinstance(m, DielectricSpecular) for m in materials]
-        self.object_material_index_map = np.array([material_map[obj.material] for obj in self.objects])
-        self.object_is_specular = np.array([material_is_specular[material_map[obj.material]] for obj in self.objects])
-        self.object_is_refractable = np.array([material_is_refractable[material_map[obj.material]] for obj in self.objects])
+        self.object_material_index_map = np.array([material_map[obj.material] for obj in self.scene_objects])
+        self.object_is_specular = np.array([material_is_specular[material_map[obj.material]] for obj in self.scene_objects])
+        self.object_is_refractable = np.array([material_is_refractable[material_map[obj.material]] for obj in self.scene_objects])
 
     def intersect(self, ray: Ray) -> Tuple[Array, Array, Array, Array]:
         """
@@ -45,7 +49,7 @@ class Scene:
         old_pos = np.full((3, N), np.inf)
         old_n = np.full((3, N), np.inf)
         object_index = np.full(N, -1, dtype=np.int32)
-        for i, object in enumerate(self.objects):
+        for i, object in enumerate(self.scene_objects):
             t, pos, n = object.intersect(ray)
             t_stack = np.stack([old_t, t], axis=0)
             pos_stack = np.stack([old_pos, pos], axis=0)
@@ -56,6 +60,15 @@ class Scene:
             old_pos = pos_stack[index, :, arange].T
             old_n = n_stack[index, :, arange].T
         return old_t, old_pos, old_n, object_index
+
+    def intersect_shadow_ray(self, ray: Ray) -> Array:
+        N = ray.direction.shape[-1]
+        old_t = np.full(N, np.inf)
+        for object in self.scene_objects:
+            t = object.intersect_shadow_ray(ray)
+            t_stack = np.stack([old_t, t], axis=0)
+            old_t = t_stack.min(axis=0)
+        return old_t
 
     @classmethod
     def from_xml(cls, path: str) -> 'Scene':

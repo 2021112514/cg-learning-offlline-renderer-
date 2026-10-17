@@ -18,10 +18,8 @@ class PointLight(Light):
         self.b = attenuations[1]
         self.c = attenuations[2]
 
-    def get_radiance(self, pos: Array) -> Tuple[Array, Array]:
+    def get_radiance(self, pos: Array) -> Tuple[Array, Array, Array, Array]:
+        N = pos.shape[-1]
         r2 = ((pos - self.position) ** 2).sum(axis=0)
         radiance = self.intensity / np.clip(self.a * r2 + self.b * np.sqrt(r2) + self.c, a_min=1e-8, a_max=None)
-        return radiance, np.broadcast_to(self.position, pos.shape)
-
-    def get_distance(self, pos: Array) -> Array:
-        return np.sqrt(((pos - self.position) ** 2).sum(axis=0))
+        return radiance, np.broadcast_to(self.position, pos.shape), np.sqrt(((pos - self.position) ** 2).sum(axis=0)), np.broadcast_to(np.ones(1), N)

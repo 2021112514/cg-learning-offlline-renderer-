@@ -15,3 +15,9 @@ from .transform import (
     build_coordinate_system,
     get_refractor_vector
 )
+from .sampling import (
+    sample_disk,
+    sample_hemisphere,
+    sample_sphere,
+    sample_triangle
+)

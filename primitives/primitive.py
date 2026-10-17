@@ -12,6 +12,7 @@ class Primitive:
         transform: Transform
     ):
         self.o2w, self.w2o = world_transform(transform.position, transform.rotation, transform.scale)
+        self.det_w = transform.scale[0] * transform.scale[1] * transform.scale[2] if isinstance(transform.scale, tuple) else transform.scale ** 3
         self.scene_object: Any = None
 
     def intersect(self, ray: Ray) -> Tuple[Array, Array, Array]:
@@ -47,6 +48,26 @@ class Primitive:
         n_o[:, not_inf] = normalize((self.w2o.T @ expand0(n_o[:, not_inf]))[:3, :])
         return t_o, pos_o, n_o
 
+    def intersect_shadow_ray(self, ray: Ray) -> Array:
+        direction_o_unorm = (self.w2o @ expand0(ray.direction))[:3, :]
+        # 摄像机每条光线方向向量变换后的长度，[N]
+        norm = np.sqrt((direction_o_unorm ** 2).sum(axis=0))
+        direction_o = direction_o_unorm / norm
+
+        # [3, N]
+        source = np.broadcast_to(ray.pos, ray.direction.shape)
+        source_pos_o = (self.w2o @ expand1(source))[:3, :]
+
+        # 世界坐标下相机到近裁剪平面每个点的距离 变换为 物体坐标下相机到近裁剪平面每个点的距离
+        # 注：共线的向量在坐标变换前后的长度之比不变，因为坐标变换是线性变换
+        min_t = ray.min_t * norm
+        max_t = ray.max_t * norm
+        t_o = self._intersect_shadow_ray(direction_o, source_pos_o, min_t, max_t)
+        not_inf = t_o < np.inf
+        # 将物体坐标系下相机到交点的距离变换为世界坐标系下相机到交点的距离
+        t_o[not_inf] = t_o[not_inf] / norm[not_inf]
+        return t_o
+
     def _intersect(self, direction: Array, source: Array, min_t: Array, max_t: Array) -> Tuple[Array, Array, Array]:
         """
         Args:
@@ -59,4 +80,29 @@ class Primitive:
             pos(Array): [3, N]，**物体坐标系下**交点位置，若无交点则为[np.inf, np.inf, np.inf]
             n(Array): [3, N]，**物体坐标系下**交点法线（可以不归一化，由intersect归一化）
         """
+        raise NotImplementedError()
+
+    def _intersect_shadow_ray(self, direction: Array, source: Array, min_t: Array, max_t: Array) -> Array:
+        raise NotImplementedError()
+
+    def sample(self, n: int) -> Tuple[Array, Array, Array]:
+        """
+        均匀采样图元表面的点
+        Args:
+            n(int): 采样点数量
+        Returns:
+            position(Array): [3, n]，采样点位置
+            normal(Array): [3, n]，采样点处的法线
+            pdf(Array): [n]，概率密度
+        """
+        position, normal, pdf = self._sample(n)
+        position_global = (self.o2w @ expand1(position))[:3, :]
+        w_T_inv_normal = (self.w2o.T @ expand0(normalize(normal)))[:3, :]
+        normal_global = normalize(w_T_inv_normal)
+        # 坐标系转换导致的PDF变化
+        # 推导见/notes/pdf_coordinate_transform.md，借助了deepseek
+        pdf_global = pdf / (abs(self.det_w) * np.sqrt(np.sum(w_T_inv_normal ** 2, axis=0)))
+        return position_global, normal_global, pdf_global
+
+    def _sample(self, n: int) -> Tuple[Array, Array, Array]:
         raise NotImplementedError()

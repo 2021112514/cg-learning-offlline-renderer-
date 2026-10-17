@@ -15,4 +15,6 @@ python -m run --scene '<scene>' --config '<config>'
 ### 折射
 ![](./assets/scene11_1.png)
 ### 重要性采样 & 渲染策略优化
-![](./assets/scene11_1(2).png)
+![](./assets/scene11_2.png)
+### 面光源
+![](./assets/scene14.png)

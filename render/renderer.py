@@ -66,11 +66,19 @@ class Renderer:
                     self.paint(asnumpy(result))
         return result
 
-    def _compute_radiance(self, ray: Ray, depth: int = 0) -> Array:
+    def _compute_radiance(self, ray: Ray, depth: int = 0, include_emissive: bool = True) -> Array:
         color = np.zeros_like(ray.direction)
         t, pos, n, object_index = self.scene.intersect(ray)
         N = t.shape[0]
         not_inf = t < np.inf
+        # 自发光
+        emissive = None
+        if include_emissive:
+            emissive = np.zeros_like(color)
+            for obj_index in range(len(self.scene.scene_objects)):
+                emissive[:, object_index == obj_index] = np.array([self.scene.scene_objects[obj_index].emissive]).T
+            # 背面不发光
+            emissive[:, not_inf] *= np.sum(n[:, not_inf] * ray.direction[:, not_inf], axis=0) < 0
         # 俄罗斯轮盘算法实现路径追踪
         if depth <= self.settings.render.min_reflection_time:
             selected = not_inf
@@ -80,7 +88,7 @@ class Renderer:
             factor = self.settings.render.reflection_probably
         N_selected = int(selected.sum())
         if N_selected == 0:
-            return color
+            return color + emissive if emissive is not None else color
         # 没有被选中的点返回0（而不是直接光照）
         idx_selected = np.arange(N)[selected]
         n_selected = n[:, selected]
@@ -102,16 +110,15 @@ class Renderer:
         N_not_specular = pos_not_specular.shape[-1]
         N_specular = int(is_specular.sum())
         for light in self.scene.lights:
-            radiance, source = light.get_radiance(pos_not_specular) # [3, N_not_specular]
+            radiance, source, max_t, pdf = light.get_radiance(pos_not_specular) # [3, N_not_specular]
             shadow_ray_direction = normalize(source - pos_not_specular)
-            max_t = light.get_distance(pos_not_specular)
             shadow_ray = Ray(
                 direction=shadow_ray_direction,
                 pos=pos_not_specular,
                 min_t=np.broadcast_to(min_t, N_not_specular),
                 max_t=max_t
             )
-            t_, _, _, _ = self.scene.intersect(shadow_ray)
+            t_ = self.scene.intersect_shadow_ray(shadow_ray)
             not_blocked = t_ == np.inf # [N_not_specular]
             not_blocked_global = np.full(N, False)
             not_blocked_global[idx_selected[not_specular]] = not_blocked
@@ -124,9 +131,9 @@ class Renderer:
                 material = self.scene.materials[material_id]
                 mask = material_index_not_blocked == material_id
                 brdf[:, mask] = material.brdf(wo_local[:, not_specular][:, not_blocked][:, mask], wi_local[:, not_blocked][:, mask])
-            color[:, not_blocked_global] += radiance[:, not_blocked] * np.clip(cos[not_blocked], a_min=0.0, a_max=None) * brdf
+            color[:, not_blocked_global] += radiance[:, not_blocked] * np.clip(cos[not_blocked], a_min=0.0, a_max=None) * brdf / pdf[not_blocked]
         if depth == self.settings.render.max_reflection_time:
-            return color / factor
+            return color / factor + emissive if emissive is not None else color / factor
         # 间接光照
         color_sum = np.full((3, N_not_specular), 0.0)
         # 非镜面材质，采用 Monte Carlo 积分求解渲染方程
@@ -149,7 +156,7 @@ class Renderer:
                 min_t=np.broadcast_to(min_t, N_not_specular),
                 max_t=np.broadcast_to(max_t_inf, N_not_specular)
             )
-            color_ = brdf * self._compute_radiance(ray, depth + 1) * wi[-1, :] / pdf
+            color_ = brdf * self._compute_radiance(ray, depth + 1, include_emissive=False) * wi[-1, :] / pdf
             color_sum += color_
         color[:, idx_selected[not_specular]] += color_sum / self.settings.render.monte_carlo_integration_sampling_times
         # 镜面材质，渲染方程的曲面积分退化为单入射方向
@@ -166,8 +173,8 @@ class Renderer:
             min_t=np.broadcast_to(min_t, N_specular),
             max_t=np.broadcast_to(max_t_inf, N_specular)
         )
-        cos_theta = np.abs(wi[-1, :])
-        color_ = brdf * self._compute_radiance(ray, depth + 1) * cos_theta
+        cos_theta = wi[-1, :]
+        color_ = brdf * self._compute_radiance(ray, depth + 1, include_emissive=True) * np.abs(cos_theta) # 镜面材质无直接光照，所以需要考虑面光源的自发光
         color[:, idx_selected[is_specular]] += color_
         # 折射
         is_refractable = self.scene.object_is_refractable[object_index_selected]
@@ -200,6 +207,6 @@ class Renderer:
                     max_t=np.broadcast_to(max_t_inf, idx_not_full_refractor_in_selected.shape[0])
                 )
                 cos_theta = wt_local[:, not_full_refractor][-1, :]
-                color_ = btdf[:, not_full_refractor] * self._compute_radiance(ray, depth + 1) * np.abs(cos_theta)
+                color_ = btdf[:, not_full_refractor] * self._compute_radiance(ray, depth + 1, True) * np.abs(cos_theta)
                 color[:, idx_selected[idx_not_full_refractor_in_selected]] += color_
-        return color / factor
+        return color / factor + emissive if emissive is not None else color / factor
