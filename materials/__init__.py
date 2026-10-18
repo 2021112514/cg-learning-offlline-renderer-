@@ -1,5 +1,7 @@
 from .material import Material
 from .lambert import Lambert
+from .oren_nayar import OrenNayar
+from .torrance_sparrow import TorranceSparrow
 from .specular import *
 from parser import tag_constructor
 

@@ -1,7 +1,7 @@
 import math
 from tqdm import tqdm
 from typing import Callable, Any, Optional
-from device import np, Array, asnumpy, random_float32, RAY_EPSILON
+from device import np, Array, asnumpy, random_float32, EPSILON
 from ray import Ray, PerspectiveCamera
 from scene import Scene
 from settings.settings import Settings
@@ -99,7 +99,7 @@ class Renderer:
         # 暂不考虑具有各向异性的材质（建系时不能仅指定法线）
         wo_local = (coord_transform_not_inf.transpose((1, 2, 0)) * -ray.direction[None, :, selected]).sum(axis=1) # [3, N_selected]
         pos_selected = pos[:, selected]
-        min_t = np.array([RAY_EPSILON], dtype=np.float32)
+        min_t = np.array([EPSILON], dtype=np.float32)
         max_t_inf = np.full_like(min_t, np.inf)
         object_index_selected = object_index[selected]
         material_index_selected = self.scene.object_material_index_map[object_index_selected]

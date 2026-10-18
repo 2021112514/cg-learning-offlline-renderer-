@@ -9,6 +9,6 @@
         <MinReflectionTime>2</MinReflectionTime>
         <MaxReflectionTime>4</MaxReflectionTime>
         <ReflectionProbably>0.8</ReflectionProbably>
-        <Split>64</Split>
+        <Split>32</Split>
     </Render>
 </Settings>

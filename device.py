@@ -1,4 +1,4 @@
-# 该文件由DeepSeek生成
+# 该文件由Agent生成
 import numpy
 import cupy
 from typing import TYPE_CHECKING
@@ -19,7 +19,7 @@ else:
 
 
 # 单精度求交的起点/终点容差，适用于当前米级场景。
-RAY_EPSILON = np.float32(1e-4)
+EPSILON = np.float32(1e-4)
 
 
 def asnumpy(x: Array) -> numpy.ndarray:
