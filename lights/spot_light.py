@@ -17,9 +17,9 @@ class SpotLight(Light):
         outer_angle: float,
         attenuations: Tuple[float, float, float]
     ):
-        self.direction = normalize(np.array([direction]).T)
-        self.position = np.array([position]).T
-        self.intensity = np.array([intensity]).T
+        self.direction = normalize(np.array([direction], dtype=np.float32).T)
+        self.position = np.array([position], dtype=np.float32).T
+        self.intensity = np.array([intensity], dtype=np.float32).T
         self.cos_inner_angle = math.cos(inner_angle * np.pi / 180)
         self.cos_outer_angle = math.cos(outer_angle * np.pi / 180)
         self.a = attenuations[0]
@@ -37,5 +37,5 @@ class SpotLight(Light):
             self.intensity * k1 * k2,
             np.broadcast_to(self.position, pos.shape),
             np.sqrt(((pos - self.position) ** 2).sum(axis=0)),
-            np.broadcast_to(np.ones(1), N)
+            np.broadcast_to(np.ones(1, dtype=np.float32), N)
         )

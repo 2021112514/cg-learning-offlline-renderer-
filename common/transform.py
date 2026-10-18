@@ -46,7 +46,7 @@ def expand1(x: Array) -> Array:
     Returns:
         x(Array): [4, N]
     """
-    return np.concat([x, np.ones((1, x.shape[-1]))], axis=0)
+    return np.concat([x, np.ones((1, x.shape[-1]), dtype=np.float32)], axis=0)
 
 
 def expand0(x: Array) -> Array:
@@ -57,7 +57,7 @@ def expand0(x: Array) -> Array:
     Returns:
         x(Array): [4, N]
     """
-    return np.concat([x, np.zeros((1, x.shape[-1]))], axis=0)
+    return np.concat([x, np.zeros((1, x.shape[-1]), dtype=np.float32)], axis=0)
 
 
 def translation(t: Union[Tuple[float, float, float], Array]) -> Tuple[Array, Array]:
@@ -70,10 +70,10 @@ def translation(t: Union[Tuple[float, float, float], Array]) -> Tuple[Array, Arr
     """
     # 注意：t 可能是 cupy 数组（如 view_transform 传入的摄像机位置），
     # 不能把 cupy 标量放进 Python 列表再构造数组，用切片赋值保持计算在 GPU 上
-    t_ = np.array(t, dtype=np.float64)
-    matrix = np.eye(4)
+    t_ = np.array(t, dtype=np.float32)
+    matrix = np.eye(4, dtype=np.float32)
     matrix[:3, 3] = -t_
-    inv = np.eye(4)
+    inv = np.eye(4, dtype=np.float32)
     inv[:3, 3] = t_
     return matrix, inv
 
@@ -100,19 +100,19 @@ def rotation(euler: Tuple[float, float, float]) -> Tuple[Array, Array]:
         [0., cx, -sx, 0.],
         [0., sx, cx, 0.],
         [0., 0., 0., 1.]
-    ])
+    ], dtype=np.float32)
     ry = np.array([
         [cy, 0., sy, 0.],
         [0., 1., 0., 0.],
         [-sy, 0., cy, 0.],
         [0., 0., 0., 1.]
-    ])
+    ], dtype=np.float32)
     rz = np.array([
         [cz, -sz, 0., 0.],
         [sz, cz, 0., 0.],
         [0., 0., 1., 0.],
         [0., 0., 0., 1.]
-    ])
+    ], dtype=np.float32)
     inv = rz @ ry @ rx
     return inv.T, inv
 
@@ -133,13 +133,13 @@ def scale(s: Union[Tuple[float, float, float], float]) -> Tuple[Array, Array]:
         [0., 1 / s[1], 0., 0.],
         [0., 0., 1 / s[2], 0.],
         [0., 0., 0., 1.]
-    ])
+    ], dtype=np.float32)
     inv = np.array([
         [s[0], 0., 0., 0.],
         [0., s[1], 0., 0.],
         [0., 0., s[2], 0.],
         [0., 0., 0., 1.]
-    ])
+    ], dtype=np.float32)
     return matrix, inv
 
 
@@ -172,7 +172,7 @@ def world_transform(
 
 def view_transform(r: Array, u: Array, l: Array, pos: Array) -> Tuple[Array, Array]:
     T, T_inv = translation(pos)
-    R = np.eye(4)
+    R = np.eye(4, dtype=np.float32)
     R[:3, :3] = np.stack([r, u, l], axis=0)
     R_inv = R.T
     M = R @ T
@@ -188,13 +188,13 @@ def projection(fov: float, alpha: float, n: float, f: float) -> Tuple[Array, Arr
         [0., 1 / tan, 0., 0.],
         [0., 0., f / (f - n), f * n / (n - f)],
         [0., 0., 1., 0.]
-    ])
+    ], dtype=np.float32)
     P_inv = np.array([
         [alpha * tan, 0., 0., 0.],
         [0., tan, 0., 0.],
         [0., 0., 0., 1.],
         [0., 0., (n - f) / (f * n), 1 / n]
-    ])
+    ], dtype=np.float32)
     return P, P_inv
 
 
@@ -204,13 +204,13 @@ def viewport(W: int, H: int) -> Tuple[Array, Array]:
         [0., - H / 2, 0., H / 2],
         [0., 0., 1., 0.],
         [0., 0., 0., 1.]
-    ])
+    ], dtype=np.float32)
     vp_inv = np.array([
         [2 / W, 0., 0., -1.],
         [0., -2 / H, 0., 1.],
         [0., 0., 1., 0.],
         [0., 0., 0., 1.]
-    ])
+    ], dtype=np.float32)
     return vp, vp_inv
 
 
@@ -224,8 +224,8 @@ def build_coordinate_system(z: Array) -> Tuple[Array, Array]:
         inv(Array): [N, 3, 3]，新坐标系到源坐标系的变换矩阵
     """
     z = normalize(z)
-    x = np.array([[1.], [0.], [0.]])
-    x = np.where(np.abs((x * z).sum(axis=0, keepdims=True)) + 1e-8 > 1.0,  np.array([[0.], [1.], [0.]]), x)
+    x = np.array([[1.], [0.], [0.]], dtype=np.float32)
+    x = np.where(np.abs((x * z).sum(axis=0, keepdims=True)) >= 1.0 - 1e-6,  np.array([[0.], [1.], [0.]], dtype=np.float32), x)
     y = normalize(np.cross(z, x, axis=0))
     x = normalize(np.cross(y, z, axis=0))
     inv = np.stack([x, y, z], axis=1).transpose((2, 0, 1))
@@ -244,7 +244,7 @@ def get_refractor_vector(wi: Array, eta_i_div_eta_t: Array) -> Tuple[Array, Arra
         not_full_refractor(Array): [3, N]，是否发生折射
     """
     cos_i = wi[2, :]
-    sin_i = np.sqrt(1 - cos_i ** 2)
+    sin_i = np.sqrt(np.clip(1 - cos_i ** 2, a_min=0.0, a_max=1.0))
     sin_t = sin_i * eta_i_div_eta_t
     not_full_refractor = sin_t < 1
     cos_i = cos_i[not_full_refractor]
@@ -252,5 +252,5 @@ def get_refractor_vector(wi: Array, eta_i_div_eta_t: Array) -> Tuple[Array, Arra
     sin_t = sin_t[not_full_refractor]
     cos_t = np.sqrt(1 - sin_t ** 2)
     sin_t_i = -sin_t / np.clip(sin_i, a_min=1e-6, a_max=1.0)
-    refractor_vector = np.concat([wi[:2, not_full_refractor] * sin_t_i, (cos_t * ((cos_i <= 0) * 2 - 1))[None, :]], axis=0)
+    refractor_vector = np.concat([wi[:2, not_full_refractor] * sin_t_i, (cos_t * np.where(cos_i <= 0, np.float32(1), np.float32(-1)))[None, :]], axis=0)
     return refractor_vector, not_full_refractor

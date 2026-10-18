@@ -14,7 +14,7 @@ class Sphere(Primitive):
     ):
         super().__init__(transform)
         self.r = radius
-        self.pdf = np.array([1 / (4 * np.pi * self.r ** 2)])
+        self.pdf = np.array([1 / (4 * np.pi * self.r ** 2)], dtype=np.float32)
 
     def _intersect(self, direction: Array, source: Array, min_t: Array, max_t: Array) -> Tuple[Array, Array, Array]:
         N = direction.shape[-1]
@@ -29,10 +29,10 @@ class Sphere(Primitive):
         t_small = np.where((t_small >= min_t) & (t_small <= max_t), t_small, np.inf)
         t = np.stack([t_large, t_small], axis=0).min(axis=0) # [N]
         not_inf = t < np.inf
-        pos = np.full((3, N), np.inf)
+        pos = np.full((3, N), np.inf, dtype=np.float32)
         pos[:, not_inf] = source[:, not_inf] + t[not_inf] * direction[:, not_inf]
         # 不能直接返回pos，否则Shape中会对同一个ndarray进行变换
-        n = np.full((3, N), np.inf)
+        n = np.full((3, N), np.inf, dtype=np.float32)
         n[:, not_inf] = pos[:, not_inf]
         return t, pos, n
 

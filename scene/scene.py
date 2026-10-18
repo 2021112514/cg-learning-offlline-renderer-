@@ -31,9 +31,9 @@ class Scene:
         }
         material_is_specular = [isinstance(m, Specular) for m in materials]
         material_is_refractable = [isinstance(m, DielectricSpecular) for m in materials]
-        self.object_material_index_map = np.array([material_map[obj.material] for obj in self.scene_objects])
-        self.object_is_specular = np.array([material_is_specular[material_map[obj.material]] for obj in self.scene_objects])
-        self.object_is_refractable = np.array([material_is_refractable[material_map[obj.material]] for obj in self.scene_objects])
+        self.object_material_index_map = np.array([material_map[obj.material] for obj in self.scene_objects], dtype=np.int32)
+        self.object_is_specular = np.array([material_is_specular[material_map[obj.material]] for obj in self.scene_objects], dtype=bool)
+        self.object_is_refractable = np.array([material_is_refractable[material_map[obj.material]] for obj in self.scene_objects], dtype=bool)
 
     def intersect(self, ray: Ray) -> Tuple[Array, Array, Array, Array]:
         """
@@ -44,30 +44,25 @@ class Scene:
             object_index(Array): [N]，与射线最先相交的`SceneObject`的索引，用于获取交点材质
         """
         N = ray.direction.shape[-1]
-        arange = np.arange(N)
-        old_t = np.full(N, np.inf)
-        old_pos = np.full((3, N), np.inf)
-        old_n = np.full((3, N), np.inf)
+        old_t = np.full(N, np.inf, dtype=np.float32)
+        old_pos = np.full((3, N), np.inf, dtype=np.float32)
+        old_n = np.full((3, N), np.inf, dtype=np.float32)
         object_index = np.full(N, -1, dtype=np.int32)
         for i, object in enumerate(self.scene_objects):
             t, pos, n = object.intersect(ray)
-            t_stack = np.stack([old_t, t], axis=0)
-            pos_stack = np.stack([old_pos, pos], axis=0)
-            n_stack = np.stack([old_n, n], axis=0)
-            index = np.argmin(t_stack, axis=0)
-            object_index[index == 1] = i
-            old_t = t_stack[index, arange]
-            old_pos = pos_stack[index, :, arange].T
-            old_n = n_stack[index, :, arange].T
+            closer = t < old_t
+            object_index[closer] = i
+            old_t = np.where(closer, t, old_t)
+            old_pos = np.where(closer, pos, old_pos)
+            old_n = np.where(closer, n, old_n)
         return old_t, old_pos, old_n, object_index
 
     def intersect_shadow_ray(self, ray: Ray) -> Array:
         N = ray.direction.shape[-1]
-        old_t = np.full(N, np.inf)
+        old_t = np.full(N, np.inf, dtype=np.float32)
         for object in self.scene_objects:
             t = object.intersect_shadow_ray(ray)
-            t_stack = np.stack([old_t, t], axis=0)
-            old_t = t_stack.min(axis=0)
+            old_t = np.minimum(t, old_t)
         return old_t
 
     @classmethod

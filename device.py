@@ -18,7 +18,18 @@ else:
     np = cupy if device == 'GPU' else numpy
 
 
+# 单精度求交的起点/终点容差，适用于当前米级场景。
+RAY_EPSILON = np.float32(1e-4)
+
+
 def asnumpy(x: Array) -> numpy.ndarray:
     """把数组转成主机内存的 numpy 数组（GPU 后端会同步，CPU 后端原样返回）"""
     return cupy.asnumpy(x)
 
+
+
+def random_float32(size: int | tuple[int, ...]) -> Array:
+    """生成 float32 均匀随机样本；GPU 后端直接分配单精度数组。"""
+    if np is cupy:
+        return cupy.random.random(size, dtype=cupy.float32) # type: ignore
+    return numpy.random.random(size).astype(numpy.float32)

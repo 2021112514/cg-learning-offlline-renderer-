@@ -1,5 +1,5 @@
 from typing import Tuple
-from device import np, Array
+from device import np, Array, RAY_EPSILON
 from .light import Light
 from scene.scene_object import SceneObject
 
@@ -16,6 +16,6 @@ class AreaLight(Light):
         d /= distance
         cos_thata_a = np.sum(d * normal, axis=0)
         cos_leq0 = cos_thata_a < 1e-6
-        radiance = np.where(cos_leq0[None, :], np.array([[0.0], [0.0], [0.0]]), np.array([self.scene_object.emissive]).T)
+        radiance = np.where(cos_leq0[None, :], np.array([[0.0], [0.0], [0.0]], dtype=np.float32), np.array([self.scene_object.emissive], dtype=np.float32).T)
         pdf_transformed = distance ** 2 * pdf / np.clip(cos_thata_a, a_min=1e-6, a_max=1.0)
-        return radiance, source, distance - 1e-6, pdf_transformed
+        return radiance, source, distance - RAY_EPSILON, pdf_transformed

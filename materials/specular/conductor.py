@@ -13,14 +13,14 @@ class ConductorSpecular(Specular):
         absorption_coef: Tuple[float, float, float],
         reflection_color: Tuple[float, float, float] = (1.0, 1.0, 1.0)
     ):
-        self.eta = np.array([eta]).T
-        self.reflection_color = np.array([reflection_color]).T
-        self.k = self.eta ** 2 + np.array([absorption_coef]).T ** 2
+        self.eta = np.array([eta], dtype=np.float32).T
+        self.reflection_color = np.array([reflection_color], dtype=np.float32).T
+        self.k = self.eta ** 2 + np.array([absorption_coef], dtype=np.float32).T ** 2
         super().__init__(name)
         
 
     def brdf(self, wo: Array, wi: Array) -> Array:
-        symm = np.sum(np.abs(wo + wi * np.array([[1.], [1.], [-1.]])) < 1e-6, axis=0) == 3
+        symm = np.sum(np.abs(wo + wi * np.array([[1.], [1.], [-1.]], dtype=np.float32)) < 1e-6, axis=0) == 3
         cos = wi[2:, symm]
         cos2 = cos ** 2
         a = self.k * cos2 + 1

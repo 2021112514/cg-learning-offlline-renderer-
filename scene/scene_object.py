@@ -30,36 +30,31 @@ class SceneObject:
 
     def intersect(self, ray: Ray) -> Tuple[Array, Array, Array]:
         N = ray.direction.shape[-1]
-        arange = np.arange(N)
-        old_t = np.full(N, np.inf)
-        old_pos = np.full((3, N), np.inf)
-        old_n = np.full((3, N), np.inf)
+        old_t = np.full(N, np.inf, dtype=np.float32)
+        old_pos = np.full((3, N), np.inf, dtype=np.float32)
+        old_n = np.full((3, N), np.inf, dtype=np.float32)
         for primitive in self.primitives:
             t, pos, n = primitive.intersect(ray)
-            t_stack = np.stack([old_t, t], axis=0)
-            pos_stack = np.stack([old_pos, pos], axis=0)
-            n_stack = np.stack([old_n, n], axis=0)
-            index = np.argmin(t_stack, axis=0)
-            old_t = t_stack[index, arange]
-            old_pos = pos_stack[index, :, arange].T
-            old_n = n_stack[index, :, arange].T
+            closer = t < old_t
+            old_t = np.where(closer, t, old_t)
+            old_pos = np.where(closer, pos, old_pos)
+            old_n = np.where(closer, n, old_n)
         return old_t, old_pos, old_n
 
     def intersect_shadow_ray(self, ray: Ray) -> Array:
         N = ray.direction.shape[-1]
-        old_t = np.full(N, np.inf)
+        old_t = np.full(N, np.inf, dtype=np.float32)
         for primitive in self.primitives:
-            t, pos, n = primitive.intersect(ray)
-            t_stack = np.stack([old_t, t], axis=0)
-            old_t = t_stack.min(axis=0)
+            t = primitive.intersect_shadow_ray(ray)
+            old_t = np.minimum(t, old_t)
         return old_t
 
     def sample(self, n: int) -> Tuple[Array, Array, Array]:
         # 遵循教程：为简单起见在primitive间均匀采样，不考虑重要性采样
         index = np.random.randint(0, len(self.primitives), (n))
-        position = np.zeros((3, n))
-        normal = np.zeros((3, n))
-        pdf = np.ones(n)
+        position = np.zeros((3, n), dtype=np.float32)
+        normal = np.zeros((3, n), dtype=np.float32)
+        pdf = np.ones(n, dtype=np.float32)
         for i in range(len(self.primitives)):
             mask = index == i
             num = int(np.sum(mask))

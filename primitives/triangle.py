@@ -13,9 +13,9 @@ class Triangle(Primitive):
         transform: Transform = identity_transform
     ):
         super().__init__(transform)
-        self.p0 = np.array([vertex[0]]).T
-        self.p1 = np.array([vertex[1]]).T
-        self.p2 = np.array([vertex[2]]).T
+        self.p0 = np.array([vertex[0]], dtype=np.float32).T
+        self.p1 = np.array([vertex[1]], dtype=np.float32).T
+        self.p2 = np.array([vertex[2]], dtype=np.float32).T
         self.e1 = self.p1 - self.p0
         self.e2 = self.p2 - self.p0
         self.n = np.cross(self.e1, self.e2, axis=0) # [3, 1]
@@ -28,14 +28,14 @@ class Triangle(Primitive):
         s2 = np.cross(s, self.e1, axis=0) # [3, N]
         det = self.e1.T @ s1 # [1, N]
         det_neq_0 = np.abs(det) > 1e-8
-        k = np.ones((1, N))
+        k = np.ones((1, N), dtype=np.float32)
         k[:, det_neq_0[0]] = 1 / det[det_neq_0]
         b1 = (k * (s * s1).sum(axis=0))[0] # [N]
         b2 = (k * (s2 * direction).sum(axis=0))[0]
         t = (k * (s2 * self.e2).sum(axis=0))[0]
         in_triangle = (t <= max_t) & (t >= min_t) & det_neq_0[0] & (b1 >= 0) & (b2 >= 0) & (b1 + b2 <= 1)
         t = np.where(in_triangle, t, np.inf)
-        pos = np.full((3, N), np.inf)
+        pos = np.full((3, N), np.inf, dtype=np.float32)
         pos[:, in_triangle] = source[:, in_triangle] + t[in_triangle] * direction[:, in_triangle]
         n = np.broadcast_to(self.n, (3, N))
         n = np.where(in_triangle, n, np.inf)
@@ -48,7 +48,7 @@ class Triangle(Primitive):
         s2 = np.cross(s, self.e1, axis=0) # [3, N]
         det = self.e1.T @ s1 # [1, N]
         det_neq_0 = np.abs(det) > 1e-8
-        k = np.ones((1, N))
+        k = np.ones((1, N), dtype=np.float32)
         k[:, det_neq_0[0]] = 1 / det[det_neq_0]
         b1 = (k * (s * s1).sum(axis=0))[0] # [N]
         b2 = (k * (s2 * direction).sum(axis=0))[0]

@@ -1,7 +1,7 @@
 import math
 from tqdm import tqdm
 from typing import Callable, Any, Optional
-from device import np, Array, asnumpy
+from device import np, Array, asnumpy, random_float32, RAY_EPSILON
 from ray import Ray, PerspectiveCamera
 from scene import Scene
 from settings.settings import Settings
@@ -20,7 +20,7 @@ class Renderer:
         # 按SSAA采样对点进行分片，减少显存压力
         with tqdm(total=self.settings.render.split) as pbar:
             pbar.set_description('Rendering slices')
-            color_sum = np.zeros((self.scene.camera.W, self.scene.camera.H, 3))
+            color_sum = np.zeros((self.scene.camera.W, self.scene.camera.H, 3), dtype=np.float32)
             camera = self.scene.camera
             color = self._compute_radiance(camera)
             pbar.update(1)
@@ -67,6 +67,8 @@ class Renderer:
         return result
 
     def _compute_radiance(self, ray: Ray, depth: int = 0, include_emissive: bool = True) -> Array:
+        if ray.direction.shape[-1] == 0:
+            return np.zeros_like(ray.direction)
         color = np.zeros_like(ray.direction)
         t, pos, n, object_index = self.scene.intersect(ray)
         N = t.shape[0]
@@ -76,7 +78,7 @@ class Renderer:
         if include_emissive:
             emissive = np.zeros_like(color)
             for obj_index in range(len(self.scene.scene_objects)):
-                emissive[:, object_index == obj_index] = np.array([self.scene.scene_objects[obj_index].emissive]).T
+                emissive[:, object_index == obj_index] = np.array([self.scene.scene_objects[obj_index].emissive], dtype=np.float32).T
             # 背面不发光
             emissive[:, not_inf] *= np.sum(n[:, not_inf] * ray.direction[:, not_inf], axis=0) < 0
         # 俄罗斯轮盘算法实现路径追踪
@@ -84,7 +86,7 @@ class Renderer:
             selected = not_inf
             factor = 1
         else:
-            selected = np.logical_and(np.random.rand(N) <= self.settings.render.reflection_probably, not_inf)
+            selected = np.logical_and(random_float32(N) <= self.settings.render.reflection_probably, not_inf)
             factor = self.settings.render.reflection_probably
         N_selected = int(selected.sum())
         if N_selected == 0:
@@ -97,11 +99,11 @@ class Renderer:
         # 暂不考虑具有各向异性的材质（建系时不能仅指定法线）
         wo_local = (coord_transform_not_inf.transpose((1, 2, 0)) * -ray.direction[None, :, selected]).sum(axis=1) # [3, N_selected]
         pos_selected = pos[:, selected]
-        min_t = np.array([1e-6])
+        min_t = np.array([RAY_EPSILON], dtype=np.float32)
         max_t_inf = np.full_like(min_t, np.inf)
         object_index_selected = object_index[selected]
         material_index_selected = self.scene.object_material_index_map[object_index_selected]
-        num_material = int(material_index_selected.max() + 1)
+        num_material = len(self.scene.materials)
         is_specular = self.scene.object_is_specular[object_index_selected]
         not_specular = np.logical_not(is_specular)
         pos_not_specular = pos_selected[:, not_specular]
@@ -125,7 +127,7 @@ class Renderer:
             cos = (n_selected[:, not_specular] * normalize(source - pos_not_specular)).sum(axis=0) # [N_not_specular]
             # 以法线为z轴的坐标系中，入射光线的方向，用于计算BRDF
             wi_local = (coord_transform_not_inf[not_specular, :, :].transpose((1, 2, 0)) * shadow_ray_direction[None, :, :]).sum(axis=1)
-            brdf = np.full((3, int(not_blocked.sum())), 0.0)
+            brdf = np.full((3, int(not_blocked.sum())), 0.0, dtype=np.float32)
             material_index_not_blocked = material_index_not_specular[not_blocked]
             for material_id in range(num_material):
                 material = self.scene.materials[material_id]
@@ -135,12 +137,12 @@ class Renderer:
         if depth == self.settings.render.max_reflection_time:
             return color / factor + emissive if emissive is not None else color / factor
         # 间接光照
-        color_sum = np.full((3, N_not_specular), 0.0)
+        color_sum = np.full((3, N_not_specular), 0.0, dtype=np.float32)
         # 非镜面材质，采用 Monte Carlo 积分求解渲染方程
         for _ in range(self.settings.render.monte_carlo_integration_sampling_times):
-            wi = np.zeros((3, N_not_specular))
-            pdf = np.ones(N_not_specular)
-            brdf = np.full((3, N_not_specular), 0.0)
+            wi = np.zeros((3, N_not_specular), dtype=np.float32)
+            pdf = np.ones(N_not_specular, dtype=np.float32)
+            brdf = np.full((3, N_not_specular), 0.0, dtype=np.float32)
             for material_id in range(num_material):
                 material = self.scene.materials[material_id]
                 mask = material_index_not_specular == material_id
@@ -160,8 +162,8 @@ class Renderer:
             color_sum += color_
         color[:, idx_selected[not_specular]] += color_sum / self.settings.render.monte_carlo_integration_sampling_times
         # 镜面材质，渲染方程的曲面积分退化为单入射方向
-        wi = wo_local[:, is_specular] * np.array([[-1.0], [-1.0], [1.0]])
-        brdf = np.zeros((3, N_specular))
+        wi = wo_local[:, is_specular] * np.array([[-1.0], [-1.0], [1.0]], dtype=np.float32)
+        brdf = np.zeros((3, N_specular), dtype=np.float32)
         for material_id in range(num_material):
             material = self.scene.materials[material_id]
             mask = material_index_specular == material_id
@@ -180,7 +182,7 @@ class Renderer:
         is_refractable = self.scene.object_is_refractable[object_index_selected]
         N_refractable = int(np.sum(is_refractable))
         if N_refractable > 0:
-            btdf = np.zeros((3, N_refractable))
+            btdf = np.zeros((3, N_refractable), dtype=np.float32)
             material_index_refractable = material_index_selected[is_refractable]
             wi = wo_local[:, is_refractable]
             arange_refractable = np.arange(material_index_refractable.shape[0])
