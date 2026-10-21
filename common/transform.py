@@ -1,6 +1,6 @@
 import math
 from device import np, Array
-from typing import Tuple, Union
+from typing import Tuple, Union, Optional
 from parser import tag
 
 
@@ -214,21 +214,25 @@ def viewport(W: int, H: int) -> Tuple[Array, Array]:
     return vp, vp_inv
 
 
-def build_coordinate_system(z: Array) -> Tuple[Array, Array]:
+def build_coordinate_system(z: Array, t: Optional[Array] = None) -> Tuple[Array, Array]:
     """
     给定`z`轴，建立坐标系，返回变换矩阵
+    也可同时指定`t`，建立TBN坐标系
     Args:
-        z(Array): [3, N]，z轴
+        z(Array): [3, N]，z轴，**默认已归一化**
+        t(Optional[Array]): [3, N]，**默认已归一化**
     Returns:
         matrix(Array): [N, 3, 3]，源坐标系到新坐标系的变换矩阵
         inv(Array): [N, 3, 3]，新坐标系到源坐标系的变换矩阵
     """
-    z = normalize(z)
-    x = np.array([[1.], [0.], [0.]], dtype=np.float32)
-    x = np.where(np.abs((x * z).sum(axis=0, keepdims=True)) >= 1.0 - 1e-6,  np.array([[0.], [1.], [0.]], dtype=np.float32), x)
-    y = normalize(np.cross(z, x, axis=0))
-    x = normalize(np.cross(y, z, axis=0))
-    inv = np.stack([x, y, z], axis=1).transpose((2, 0, 1))
+    if t is None:
+        t = np.array([[1.], [0.], [0.]], dtype=np.float32)
+        t = np.where(np.abs((t * z).sum(axis=0, keepdims=True)) >= 1.0 - 1e-6,  np.array([[0.], [1.], [0.]], dtype=np.float32), t)
+        b = normalize(np.cross(z, t, axis=0))
+        t = normalize(np.cross(b, z, axis=0))
+    else:
+        b = np.cross(z, t, axis=0)
+    inv = np.stack([t, b, z], axis=1).transpose((2, 0, 1))
     matrix = inv.transpose((0, 2, 1))
     return matrix, inv
 
@@ -252,5 +256,8 @@ def get_refractor_vector(wi: Array, eta_i_div_eta_t: Array) -> Tuple[Array, Arra
     sin_t = sin_t[not_full_refractor]
     cos_t = np.sqrt(1 - sin_t ** 2)
     sin_t_i = -sin_t / np.clip(sin_i, a_min=1e-6, a_max=1.0)
-    refractor_vector = np.concat([wi[:2, not_full_refractor] * sin_t_i, (cos_t * np.where(cos_i <= 0, np.float32(1), np.float32(-1)))[None, :]], axis=0)
+    refractor_vector = np.concat(
+        [wi[:2, not_full_refractor] * sin_t_i, (cos_t * np.where(cos_i <= 0, np.float32(1), np.float32(-1)))[None, :]],
+        axis=0
+    )
     return refractor_vector, not_full_refractor

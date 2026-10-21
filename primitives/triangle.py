@@ -23,8 +23,11 @@ class Triangle(Primitive):
         self.e2 = self.p2 - self.p0
         self.n = np.cross(self.e1, self.e2, axis=0) # [3, 1]
         self.pdf = 2 / np.sqrt((self.n ** 2).sum())
+        du1, dv1 = self.uv1 - self.uv0
+        du2, dv2 = self.uv2 - self.uv0
+        self.tangent = (dv2 * self.e1 - dv1 * self.e2) / (du1 * dv2 - du2 * dv1)
 
-    def _intersect(self, direction: Array, source: Array, min_t: Array, max_t: Array) -> Tuple[Array, Array, Array, Array]:
+    def _intersect(self, direction: Array, source: Array, min_t: Array, max_t: Array) -> Tuple[Array, Array, Array, Array, Array]:
         N = direction.shape[-1]
         s = source - self.p0 # [3, N]
         s1 = np.cross(direction, self.e2, axis=0) # [3, N]
@@ -43,7 +46,7 @@ class Triangle(Primitive):
         n = np.broadcast_to(self.n, (3, N))
         n = np.where(in_triangle, n, np.inf)
         uv = (1 - b1 - b2) * self.uv0 + b1 * self.uv1 + b2 * self.uv2
-        return t, pos, n, uv
+        return t, pos, n, uv, np.broadcast_to(self.tangent, (3, N))
 
     def _intersect_shadow_ray(self, direction: Array, source: Array, min_t: Array, max_t: Array) -> Array:
         N = direction.shape[-1]

@@ -6,8 +6,15 @@ from parser import tag
 
 @tag()
 class Lambert(Material):
-    def __init__(self, albedo: Tuple[float, float, float], name: str, albedo_map: Optional[str] = None):
-        super().__init__(name, albedo_map)
+    def __init__(
+        self,
+        albedo: Tuple[float, float, float],
+        name: str,
+        albedo_map: Optional[str] = None,
+        normal_map: Optional[str] = None,
+        bump_scale: float = 1
+    ):
+        super().__init__(name, albedo_map, normal_map, bump_scale)
         self.albedo = np.array([albedo], dtype=np.float32).T
 
     def _brdf(self, wo: Array, wi: Array) -> Array:

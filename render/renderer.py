@@ -70,8 +70,9 @@ class Renderer:
         if ray.direction.shape[-1] == 0:
             return np.zeros_like(ray.direction)
         color = np.zeros_like(ray.direction)
-        t, pos, n, uv, object_index = self.scene.intersect(ray)
+        t, pos, n, uv, tangent, object_index = self.scene.intersect(ray)
         N = t.shape[0]
+        idx = np.arange(N, dtype=np.int32)
         not_inf = t < np.inf
         # 自发光
         emissive = None
@@ -88,18 +89,18 @@ class Renderer:
         else:
             selected = np.logical_and(random_float32(N) <= self.settings.render.reflection_probably, not_inf)
             factor = self.settings.render.reflection_probably
-        N_selected = int(selected.sum())
+        idx_selected = idx[selected]
+        arange_selected = np.arange(idx_selected.shape[0])
+        N_selected = idx_selected.shape[0]
         if N_selected == 0:
             return color + emissive if emissive is not None else color
         # 没有被选中的点返回0（而不是直接光照）
-        idx_selected = np.arange(N)[selected]
         n_selected = n[:, selected]
-        coord_transform_not_inf, coord_transform_inv = build_coordinate_system(n_selected) # [N_selected, 3, 3]
-        # 以法线为z轴的坐标系中，出射光线的方向，用于计算BRDF
-        # 暂不考虑具有各向异性的材质（建系时不能仅指定法线）
-        wo_local = (coord_transform_not_inf.transpose((1, 2, 0)) * -ray.direction[None, :, selected]).sum(axis=1) # [3, N_selected]
         pos_selected = pos[:, selected]
-        uv_selected = uv[:, selected]
+        uv_seleced = uv[:, selected]
+        coord_transform, coord_transform_inv = build_coordinate_system(n_selected, tangent[:, selected]) # [N_selected, 3, 3]
+        # 以法线为z轴的坐标系中，出射光线的方向，用于计算BRDF
+        wo_local = (coord_transform.transpose((1, 2, 0)) * -ray.direction[None, :, selected]).sum(axis=1) # [3, N_selected]
         min_t = np.array([EPSILON], dtype=np.float32)
         max_t_inf = np.full_like(min_t, np.inf)
         object_index_selected = object_index[selected]
@@ -107,11 +108,16 @@ class Renderer:
         num_material = len(self.scene.materials)
         is_specular = self.scene.object_is_specular[object_index_selected]
         not_specular = np.logical_not(is_specular)
+        idx_selected_not_secular = idx_selected[not_specular]
+        idx_not_specular_in_selected = arange_selected[not_specular]
         pos_not_specular = pos_selected[:, not_specular]
-        material_index_not_specular = material_index_selected[not_specular]
-        material_index_specular = material_index_selected[is_specular]
-        N_not_specular = pos_not_specular.shape[-1]
-        N_specular = int(is_specular.sum())
+        material_index_not_specular = material_index_selected[idx_not_specular_in_selected]
+        N_not_specular = idx_selected_not_secular.shape[0]
+        coord_transform_not_specular = coord_transform[idx_not_specular_in_selected]
+        coord_transform_inv_not_specular = coord_transform_not_specular.transpose((0, 2, 1))
+        wo_local_not_specular = wo_local[:, idx_not_specular_in_selected]
+        uv_not_specular = uv_seleced[:, not_specular]
+        uv_specular = uv_seleced[:, is_specular]
         for light in self.scene.lights:
             radiance, source, max_t, pdf = light.get_radiance(pos_not_specular) # [3, N_not_specular]
             shadow_ray_direction = normalize(source - pos_not_specular)
@@ -123,22 +129,30 @@ class Renderer:
             )
             t_ = self.scene.intersect_shadow_ray(shadow_ray)
             not_blocked = t_ == np.inf # [N_not_specular]
-            not_blocked_global = np.full(N, False)
-            not_blocked_global[idx_selected[not_specular]] = not_blocked
-            cos = (n_selected[:, not_specular] * normalize(source - pos_not_specular)).sum(axis=0) # [N_not_specular]
+            idx_not_blocked = idx_selected_not_secular[not_blocked]
+            cos = (n_selected[:, not_blocked] * normalize(source[:, not_blocked] - pos_selected[:, not_blocked])).sum(axis=0) # [N_not_blocked]
             # 以法线为z轴的坐标系中，入射光线的方向，用于计算BRDF
-            wi_local = (coord_transform_not_inf[not_specular, :, :].transpose((1, 2, 0)) * shadow_ray_direction[None, :, :]).sum(axis=1)
+            wi_local = (coord_transform_not_specular.transpose((1, 2, 0)) * shadow_ray_direction[None, :, :]).sum(axis=1)
             brdf = np.full((3, int(not_blocked.sum())), 0.0, dtype=np.float32)
             material_index_not_blocked = material_index_not_specular[not_blocked]
+            wo_local_not_specular_not_blocked = wo_local_not_specular[:, not_blocked]
+            wi_local_not_blcked = wi_local[:, not_blocked]
+            uv_not_specular_not_blocked = uv_not_specular[:, not_blocked]
             for material_id in range(num_material):
                 material = self.scene.materials[material_id]
                 mask = material_index_not_blocked == material_id
+                wi_material = wi_local_not_blcked[:, mask]
                 brdf[:, mask] = material.brdf(
-                    wo_local[:, not_specular][:, not_blocked][:, mask],
-                    wi_local[:, not_blocked][:, mask],
-                    uv_selected[:, not_specular][:, not_blocked][:, mask]
+                    wo_local_not_specular_not_blocked[:, mask],
+                    wi_material,
+                    uv_not_specular_not_blocked[:, mask]
                 )
-            color[:, not_blocked_global] += radiance[:, not_blocked] * np.clip(cos[not_blocked], a_min=0.0, a_max=None) * brdf / pdf[not_blocked]
+                if material.normal_map is not None:
+                    normal_color = material.normal_map.sample(uv_not_specular_not_blocked[:, mask])
+                    shader_normal = normalize(material.bump_scale * (2 * normal_color - 1) +\
+                        (1 - material.bump_scale) * np.array([[0], [0], [1]], dtype=np.float32))
+                    cos[mask] = np.sum(wi_material * shader_normal, axis=0)
+            color[:, idx_not_blocked] += radiance[:, not_blocked] * np.clip(cos, a_min=0.0, a_max=None) * brdf / pdf[not_blocked]
         if depth == self.settings.render.max_reflection_time:
             return color / factor + emissive if emissive is not None else color / factor
         # 间接光照
@@ -146,52 +160,70 @@ class Renderer:
         # 非镜面材质，采用 Monte Carlo 积分求解渲染方程
         for _ in range(self.settings.render.monte_carlo_integration_sampling_times):
             wi = np.zeros((3, N_not_specular), dtype=np.float32)
+            cos = np.zeros(N_not_specular, dtype=np.float32)
             pdf = np.ones(N_not_specular, dtype=np.float32)
             brdf = np.full((3, N_not_specular), 0.0, dtype=np.float32)
             for material_id in range(num_material):
                 material = self.scene.materials[material_id]
                 mask = material_index_not_specular == material_id
                 if int(np.sum(mask)) > 0:
-                    sampled_wi, sampled_pdf = material.sample_wi(wo_local[:, not_specular][:, mask])
+                    sampled_wi, sampled_pdf = material.sample_wi(wo_local_not_specular[:, mask])
                     wi[:, mask] = sampled_wi
+                    cos[mask] = sampled_wi[-1]
                     pdf[mask] = sampled_pdf
-                    brdf[:, mask] = material.brdf(wo_local[:, not_specular][:, mask], wi[:, mask], uv_selected[:, not_specular][:, mask])
-            direction_wi_global = (coord_transform_inv[not_specular, :, :].transpose((1, 2, 0)) * wi).sum(axis=1)
+                    brdf[:, mask] = material.brdf(wo_local_not_specular[:, mask], wi[:, mask], uv_not_specular[:, mask])
+                    if material.normal_map is not None:
+                        normal_color = material.normal_map.sample(uv_not_specular[:, mask])
+                        shader_normal = normalize(material.bump_scale * (2 * normal_color - 1) +\
+                            (1 - material.bump_scale) * np.array([[0], [0], [1]], dtype=np.float32))
+                        cos[mask] = np.sum(sampled_wi * shader_normal, axis=0)
+            direction_wi_global = (coord_transform_inv_not_specular.transpose((1, 2, 0)) * wi).sum(axis=1)
             ray = Ray(
                 direction=direction_wi_global,
                 pos=pos_not_specular,
                 min_t=np.broadcast_to(min_t, N_not_specular),
                 max_t=np.broadcast_to(max_t_inf, N_not_specular)
             )
-            color_ = brdf * self._compute_radiance(ray, depth + 1, include_emissive=False) * wi[-1, :] / pdf
+            color_ = brdf * self._compute_radiance(ray, depth + 1, include_emissive=False) * np.clip(cos, a_min=0.0, a_max=None) / pdf
             color_sum += color_
         color[:, idx_selected[not_specular]] += color_sum / self.settings.render.monte_carlo_integration_sampling_times
+        idx_selected_specular = idx_selected[is_specular]
+        N_specular = idx_selected_specular.shape[0]
         # 镜面材质，渲染方程的曲面积分退化为单入射方向
+        material_index_specular = material_index_selected[is_specular]
         wi = wo_local[:, is_specular] * np.array([[-1.0], [-1.0], [1.0]], dtype=np.float32)
+        cos_theta = np.array(wi[-1, :], dtype=np.float32)
         brdf = np.zeros((3, N_specular), dtype=np.float32)
+        wo_local_selected_specular = wo_local[:, is_specular]
+        coord_transform_inv_specular = coord_transform_inv[is_specular]
         for material_id in range(num_material):
             material = self.scene.materials[material_id]
             mask = material_index_specular == material_id
-            brdf[:, mask] = material.brdf(wo_local[:, is_specular][:, mask], wi[:, mask], uv_selected[:, is_specular][:, mask])
-        direction_wi_global = np.sum(coord_transform_inv[is_specular, :, :].transpose((1, 2, 0)) * wi, axis=1)
+            brdf[:, mask] = material.brdf(wo_local_selected_specular[:, mask], wi[:, mask], uv_specular[:, mask])
+            if material.normal_map is not None:
+                normal_color = material.normal_map.sample(uv_specular[:, mask])
+                shader_normal = normalize(material.bump_scale * (2 * normal_color - 1) +\
+                    (1 - material.bump_scale) * np.array([[0], [0], [1]], dtype=np.float32))
+                cos_ = np.sum(wi[:, mask] * shader_normal, axis=0)
+                cos_theta[mask] = np.where(cos_ * wi[-1, mask] > 0, cos_, 0)
+        direction_wi_global = np.sum(coord_transform_inv_specular.transpose((1, 2, 0)) * wi, axis=1)
         ray = Ray(
             direction=direction_wi_global,
             pos=pos_selected[:, is_specular],
             min_t=np.broadcast_to(min_t, N_specular),
             max_t=np.broadcast_to(max_t_inf, N_specular)
         )
-        cos_theta = wi[-1, :]
         color_ = brdf * self._compute_radiance(ray, depth + 1, include_emissive=True) * np.abs(cos_theta) # 镜面材质无直接光照，所以需要考虑面光源的自发光
-        color[:, idx_selected[is_specular]] += color_
+        color[:, idx_selected_specular] += color_
         # 折射
         is_refractable = self.scene.object_is_refractable[object_index_selected]
-        N_refractable = int(np.sum(is_refractable))
+        idx_refractable_in_selected = arange_selected[is_refractable]
+        N_refractable = idx_refractable_in_selected.shape[0]
         if N_refractable > 0:
             btdf = np.zeros((3, N_refractable), dtype=np.float32)
-            material_index_refractable = material_index_selected[is_refractable]
-            wi = wo_local[:, is_refractable]
+            material_index_refractable = material_index_selected[idx_refractable_in_selected]
+            wi = wo_local[:, idx_refractable_in_selected]
             arange_refractable = np.arange(material_index_refractable.shape[0])
-            idx_refractable_in_selected = np.arange(idx_selected.shape[0])[is_refractable]
             not_full_refractor = np.full_like(idx_refractable_in_selected, False, dtype=bool)
             wt_local = np.zeros_like(wi)
             for material_id in range(num_material):

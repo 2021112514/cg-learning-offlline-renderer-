@@ -7,8 +7,16 @@ from device import np, Array
 
 @tag()
 class DielectricSpecular(Specular):
-    def __init__(self, name: str, eta: float, transmission_color: Tuple[float, float, float], albedo_map: Optional[str] = None):
-        super().__init__(name, albedo_map)
+    def __init__(
+        self,
+        name: str,
+        eta: float,
+        transmission_color: Tuple[float, float, float],
+        albedo_map: Optional[str] = None,
+        normal_map: Optional[str] = None,
+        bump_scale: float = 1
+    ):
+        super().__init__(name, albedo_map, normal_map, bump_scale)
         self.eta = np.float32(eta)
         self.transmission_color = np.array([transmission_color], dtype=np.float32).T
 

@@ -31,15 +31,17 @@ class Texture:
         """
         H, W, _ = self.image.shape
         # wrap
-        uv = uv - np.array(uv, dtype=np.int32)
+        uv = uv - np.floor(uv, dtype=np.float32)
         uv[uv < 0] += 1
         x, y = uv * np.array([[W], [H]], dtype=np.float32) - 0.5
-        x_int = np.floor(x, dtype=np.int32)
-        y_int = np.floor(y, dtype=np.int32)
-        k1 = (x - x_int)[:, None]
-        k2 = (y - y_int)[:, None]
-        x_int_1 = x_int + 1 % W
-        y_int_1 = y_int + 1 % H
+        x_floor = np.floor(x, dtype=np.float32)
+        y_floor = np.floor(y, dtype=np.float32)
+        k1 = (x - x_floor)[:, None]
+        k2 = (y - y_floor)[:, None]
+        x_int = x_floor.astype(np.int32)
+        y_int = y_floor.astype(np.int32)
+        x_int_1 = (x_int + 1) % W
+        y_int_1 = (y_int + 1) % H
         x_int = x_int % W
         y_int = y_int % H
         c1 = self.image[y_int, x_int] * (1 - k1) + self.image[y_int, x_int_1] * k1

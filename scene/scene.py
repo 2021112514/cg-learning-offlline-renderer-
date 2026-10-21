@@ -35,13 +35,14 @@ class Scene:
         self.object_is_specular = np.array([material_is_specular[material_map[obj.material]] for obj in self.scene_objects], dtype=bool)
         self.object_is_refractable = np.array([material_is_refractable[material_map[obj.material]] for obj in self.scene_objects], dtype=bool)
 
-    def intersect(self, ray: Ray) -> Tuple[Array, Array, Array, Array, Array]:
+    def intersect(self, ray: Ray) -> Tuple[Array, Array, Array, Array, Array, Array]:
         """
         Returns:
             t(Array): [N]，交点距射线原点的距离
             pos(Array): [3, N]，交点坐标
             n(Array): [3, N]，交点法线
             uv(Array): [2, N]，uv坐标
+            tangent(Array): [3, N]，切向量
             object_index(Array): [N]，与射线最先相交的`SceneObject`的索引，用于获取交点材质
         """
         N = ray.direction.shape[-1]
@@ -49,16 +50,18 @@ class Scene:
         old_pos = np.full((3, N), np.inf, dtype=np.float32)
         old_n = np.full((3, N), np.inf, dtype=np.float32)
         old_uv = np.zeros((2, N), dtype=np.float32)
+        old_tangent = np.zeros((3, N), dtype=np.float32)
         object_index = np.full(N, -1, dtype=np.int32)
         for i, object in enumerate(self.scene_objects):
-            t, pos, n, uv = object.intersect(ray)
+            t, pos, n, uv, tangent = object.intersect(ray)
             closer = t < old_t
             object_index[closer] = i
             old_t = np.where(closer, t, old_t)
             old_pos = np.where(closer, pos, old_pos)
             old_n = np.where(closer, n, old_n)
             old_uv = np.where(closer, uv, old_uv)
-        return old_t, old_pos, old_n, old_uv, object_index
+            old_tangent = np.where(closer, tangent, old_tangent)
+        return old_t, old_pos, old_n, old_uv, old_tangent, object_index
 
     def intersect_shadow_ray(self, ray: Ray) -> Array:
         N = ray.direction.shape[-1]

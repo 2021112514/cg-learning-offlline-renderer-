@@ -15,13 +15,14 @@ class Primitive:
         self.det_w = transform.scale[0] * transform.scale[1] * transform.scale[2] if isinstance(transform.scale, tuple) else transform.scale ** 3
         self.scene_object: Any = None
 
-    def intersect(self, ray: Ray) -> Tuple[Array, Array, Array, Array]:
+    def intersect(self, ray: Ray) -> Tuple[Array, Array, Array, Array, Array]:
         """
         Returns:
             t(Array): [N]，交点与摄像机的距离，若无交点则为np.inf
             pos(Array): [3, N]，交点位置，若无交点则为[np.inf, np.inf, np.inf]
             n(Array): [3, N]，交点法线
             uv(Array): [2, N]，uv坐标
+            tangent(Array): [3, N]，切向量
         """
         direction_o_unorm = (self.w2o @ expand0(ray.direction))[:3, :]
         # 摄像机每条光线方向向量变换后的长度，[N]
@@ -36,18 +37,19 @@ class Primitive:
         # 注：共线的向量在坐标变换前后的长度之比不变，因为坐标变换是线性变换
         min_t = ray.min_t * norm
         max_t = ray.max_t * norm
-        t_o, pos_o, n_o, uv = self._intersect(direction_o, source_pos_o, min_t, max_t)
-        not_inf = t_o < np.inf
+        t, pos, n, uv, tangent = self._intersect(direction_o, source_pos_o, min_t, max_t)
+        not_inf = t < np.inf
         # 将物体坐标系下相机到交点的距离变换为世界坐标系下相机到交点的距离
-        t_o[not_inf] = t_o[not_inf] / norm[not_inf]
-        pos_o[:, not_inf] = (self.o2w @ expand1(pos_o[:, not_inf]))[:3, :]
+        t[not_inf] = t[not_inf] / norm[not_inf]
+        pos[:, not_inf] = (self.o2w @ expand1(pos[:, not_inf]))[:3, :]
 
         # 注意：法线不能直接使用o2w变换，因为缩放矩阵的对角元不同时会使原本正交的向量在变换后变得不正交
         # 物体坐标系中的法向量n'与u正交：(n')^Tu=0，世界坐标系中的n应满足n^T o2w u=0
         # 故n^T o2w = k (n')^T，不妨令k=1，则n=((o2w)^{-1})^T n'=(w2o)^T n'
         # 实际上，若缩放矩阵对角元不同，则两坐标系下同一点处的法向量不同
-        n_o[:, not_inf] = normalize((self.w2o.T @ expand0(n_o[:, not_inf]))[:3, :])
-        return t_o, pos_o, n_o, uv
+        n[:, not_inf] = normalize((self.w2o.T @ expand0(n[:, not_inf]))[:3, :])
+        tangent = normalize((self.o2w @ expand0(tangent))[:3, :])
+        return t, pos, n, uv, tangent
 
     def intersect_shadow_ray(self, ray: Ray) -> Array:
         direction_o_unorm = (self.w2o @ expand0(ray.direction))[:3, :]
@@ -69,7 +71,7 @@ class Primitive:
         t_o[not_inf] = t_o[not_inf] / norm[not_inf]
         return t_o
 
-    def _intersect(self, direction: Array, source: Array, min_t: Array, max_t: Array) -> Tuple[Array, Array, Array, Array]:
+    def _intersect(self, direction: Array, source: Array, min_t: Array, max_t: Array) -> Tuple[Array, Array, Array, Array, Array]:
         """
         Args:
             direction(Array): [3, N]，**物体坐标系下**光线的方向向量
@@ -81,6 +83,7 @@ class Primitive:
             pos(Array): [3, N]，**物体坐标系下**交点位置，若无交点则为[np.inf, np.inf, np.inf]
             n(Array): [3, N]，**物体坐标系下**交点法线（可以不归一化，由intersect归一化）
             uv(Array): [2, N]，uv坐标
+            tangent(Array): [3, N]，**物体坐标系下**的切向量
         """
         raise NotImplementedError()
 

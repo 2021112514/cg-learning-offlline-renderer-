@@ -28,20 +28,22 @@ class SceneObject:
         self.emissive = emissive
         self.material = material
 
-    def intersect(self, ray: Ray) -> Tuple[Array, Array, Array, Array]:
+    def intersect(self, ray: Ray) -> Tuple[Array, Array, Array, Array, Array]:
         N = ray.direction.shape[-1]
         old_t = np.full(N, np.inf, dtype=np.float32)
         old_pos = np.full((3, N), np.inf, dtype=np.float32)
         old_n = np.full((3, N), np.inf, dtype=np.float32)
         old_uv = np.zeros((2, N), dtype=np.float32)
+        old_tangent = np.zeros((3, N), dtype=np.float32)
         for primitive in self.primitives:
-            t, pos, n, uv = primitive.intersect(ray)
+            t, pos, n, uv, tangent = primitive.intersect(ray)
             closer = t < old_t
             old_t = np.where(closer, t, old_t)
             old_pos = np.where(closer, pos, old_pos)
             old_n = np.where(closer, n, old_n)
             old_uv = np.where(closer, uv, old_uv)
-        return old_t, old_pos, old_n, old_uv
+            old_tangent = np.where(closer, tangent, old_tangent)
+        return old_t, old_pos, old_n, old_uv, old_tangent
 
     def intersect_shadow_ray(self, ray: Ray) -> Array:
         N = ray.direction.shape[-1]

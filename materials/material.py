@@ -4,9 +4,11 @@ from texture import Texture
 
 
 class Material:
-    def __init__(self, name: str, texture: Optional[str] = None):
+    def __init__(self, name: str, texture: Optional[str] = None, normal_map: Optional[str] = None, bump_scale: float = 1):
         self.name = name
         self.texture = Texture(texture) if texture is not None else None
+        self.normal_map = Texture(normal_map) if normal_map is not None else None
+        self.bump_scale = bump_scale
 
     def brdf(self, wo: Array, wi: Array, uv: Array) -> Array:
         """
