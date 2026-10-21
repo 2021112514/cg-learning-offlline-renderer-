@@ -15,12 +15,13 @@ class Primitive:
         self.det_w = transform.scale[0] * transform.scale[1] * transform.scale[2] if isinstance(transform.scale, tuple) else transform.scale ** 3
         self.scene_object: Any = None
 
-    def intersect(self, ray: Ray) -> Tuple[Array, Array, Array]:
+    def intersect(self, ray: Ray) -> Tuple[Array, Array, Array, Array]:
         """
         Returns:
             t(Array): [N]，交点与摄像机的距离，若无交点则为np.inf
             pos(Array): [3, N]，交点位置，若无交点则为[np.inf, np.inf, np.inf]
             n(Array): [3, N]，交点法线
+            uv(Array): [2, N]，uv坐标
         """
         direction_o_unorm = (self.w2o @ expand0(ray.direction))[:3, :]
         # 摄像机每条光线方向向量变换后的长度，[N]
@@ -35,7 +36,7 @@ class Primitive:
         # 注：共线的向量在坐标变换前后的长度之比不变，因为坐标变换是线性变换
         min_t = ray.min_t * norm
         max_t = ray.max_t * norm
-        t_o, pos_o, n_o = self._intersect(direction_o, source_pos_o, min_t, max_t)
+        t_o, pos_o, n_o, uv = self._intersect(direction_o, source_pos_o, min_t, max_t)
         not_inf = t_o < np.inf
         # 将物体坐标系下相机到交点的距离变换为世界坐标系下相机到交点的距离
         t_o[not_inf] = t_o[not_inf] / norm[not_inf]
@@ -46,7 +47,7 @@ class Primitive:
         # 故n^T o2w = k (n')^T，不妨令k=1，则n=((o2w)^{-1})^T n'=(w2o)^T n'
         # 实际上，若缩放矩阵对角元不同，则两坐标系下同一点处的法向量不同
         n_o[:, not_inf] = normalize((self.w2o.T @ expand0(n_o[:, not_inf]))[:3, :])
-        return t_o, pos_o, n_o
+        return t_o, pos_o, n_o, uv
 
     def intersect_shadow_ray(self, ray: Ray) -> Array:
         direction_o_unorm = (self.w2o @ expand0(ray.direction))[:3, :]
@@ -68,7 +69,7 @@ class Primitive:
         t_o[not_inf] = t_o[not_inf] / norm[not_inf]
         return t_o
 
-    def _intersect(self, direction: Array, source: Array, min_t: Array, max_t: Array) -> Tuple[Array, Array, Array]:
+    def _intersect(self, direction: Array, source: Array, min_t: Array, max_t: Array) -> Tuple[Array, Array, Array, Array]:
         """
         Args:
             direction(Array): [3, N]，**物体坐标系下**光线的方向向量
@@ -79,6 +80,7 @@ class Primitive:
             t(Array): [N]，**物体坐标系下**交点与光线起点的距离，若无交点则为np.inf
             pos(Array): [3, N]，**物体坐标系下**交点位置，若无交点则为[np.inf, np.inf, np.inf]
             n(Array): [3, N]，**物体坐标系下**交点法线（可以不归一化，由intersect归一化）
+            uv(Array): [2, N]，uv坐标
         """
         raise NotImplementedError()
 

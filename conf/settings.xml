@@ -11,4 +11,9 @@
         <ReflectionProbably>0.8</ReflectionProbably>
         <Split>32</Split>
     </Render>
+    <Resources>
+        <Texture>
+            ./scenes/texture/
+        </Texture>
+    </Resources>
 </Settings>

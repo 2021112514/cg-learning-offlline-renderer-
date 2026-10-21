@@ -18,3 +18,5 @@ python -m run --scene '<scene>' --config '<config>'
 ![](./assets/scene11_2.png)
 ### 面光源
 ![](./assets/scene14.png)
+### 纹理
+![](./assets/scene16_2.png)

@@ -1,4 +1,4 @@
-from typing import Tuple
+from typing import Tuple, Optional
 from device import np, Array, random_float32, EPSILON
 from common import normalize
 from .material import Material
@@ -13,15 +13,16 @@ class TorranceSparrow(Material):
         reflection_color: Tuple[float, float, float],
         eta: Tuple[float, float, float],
         absorption_coef: Tuple[float, float, float],
-        exponent: float
+        exponent: float,
+        albedo_map: Optional[str]
     ):
-        super().__init__(name)
+        super().__init__(name, albedo_map)
         self.eta = np.array([eta], dtype=np.float32).T
         self.reflection_color = np.array([reflection_color], dtype=np.float32).T
         self.k = self.eta ** 2 + np.array([absorption_coef], dtype=np.float32).T ** 2
         self.e = exponent
 
-    def brdf(self, wo: Array, wi: Array) -> Array:
+    def _brdf(self, wo: Array, wi: Array) -> Array:
         valid = np.logical_and(wo[2, :] > EPSILON, wi[2, :] > EPSILON)
         valid = np.full(wo.shape[-1], True, dtype=bool)
         brdf = np.zeros_like(wo)

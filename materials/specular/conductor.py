@@ -1,4 +1,4 @@
-from typing import Tuple
+from typing import Tuple, Optional
 from .specular import Specular
 from parser import tag
 from device import np, Array
@@ -11,15 +11,15 @@ class ConductorSpecular(Specular):
         name: str,
         eta: Tuple[float, float, float],
         absorption_coef: Tuple[float, float, float],
-        reflection_color: Tuple[float, float, float] = (1.0, 1.0, 1.0)
+        reflection_color: Tuple[float, float, float] = (1.0, 1.0, 1.0),
+        albedo_map: Optional[str] = None
     ):
+        super().__init__(name, albedo_map)
         self.eta = np.array([eta], dtype=np.float32).T
         self.reflection_color = np.array([reflection_color], dtype=np.float32).T
         self.k = self.eta ** 2 + np.array([absorption_coef], dtype=np.float32).T ** 2
-        super().__init__(name)
-        
 
-    def brdf(self, wo: Array, wi: Array) -> Array:
+    def _brdf(self, wo: Array, wi: Array) -> Array:
         symm = np.sum(np.abs(wo + wi * np.array([[1.], [1.], [-1.]], dtype=np.float32)) < 1e-6, axis=0) == 3
         cos = wi[2, symm]
         cos2 = cos ** 2

@@ -9,19 +9,22 @@ from parser import tag
 class Triangle(Primitive):
     def __init__(
         self,
-        vertex: List[Tuple[float, float, float]],
+        vertex: List[Tuple[float, float, float]] | List[Tuple[float, float, float, float, float]],
         transform: Transform = identity_transform
     ):
         super().__init__(transform)
-        self.p0 = np.array([vertex[0]], dtype=np.float32).T
-        self.p1 = np.array([vertex[1]], dtype=np.float32).T
-        self.p2 = np.array([vertex[2]], dtype=np.float32).T
+        self.p0 = np.array([vertex[0][:3]], dtype=np.float32).T
+        self.p1 = np.array([vertex[1][:3]], dtype=np.float32).T
+        self.p2 = np.array([vertex[2][:3]], dtype=np.float32).T
+        self.uv0 = np.array([vertex[0][3:]], dtype=np.float32).T if len(vertex[0]) == 5 else np.zeros((2, 1), dtype=np.float32)
+        self.uv1 = np.array([vertex[1][3:]], dtype=np.float32).T if len(vertex[1]) == 5 else np.zeros((2, 1), dtype=np.float32)
+        self.uv2 = np.array([vertex[2][3:]], dtype=np.float32).T if len(vertex[2]) == 5 else np.zeros((2, 1), dtype=np.float32)
         self.e1 = self.p1 - self.p0
         self.e2 = self.p2 - self.p0
         self.n = np.cross(self.e1, self.e2, axis=0) # [3, 1]
         self.pdf = 2 / np.sqrt((self.n ** 2).sum())
 
-    def _intersect(self, direction: Array, source: Array, min_t: Array, max_t: Array) -> Tuple[Array, Array, Array]:
+    def _intersect(self, direction: Array, source: Array, min_t: Array, max_t: Array) -> Tuple[Array, Array, Array, Array]:
         N = direction.shape[-1]
         s = source - self.p0 # [3, N]
         s1 = np.cross(direction, self.e2, axis=0) # [3, N]
@@ -39,7 +42,8 @@ class Triangle(Primitive):
         pos[:, in_triangle] = source[:, in_triangle] + t[in_triangle] * direction[:, in_triangle]
         n = np.broadcast_to(self.n, (3, N))
         n = np.where(in_triangle, n, np.inf)
-        return t, pos, n
+        uv = (1 - b1 - b2) * self.uv0 + b1 * self.uv1 + b2 * self.uv2
+        return t, pos, n, uv
 
     def _intersect_shadow_ray(self, direction: Array, source: Array, min_t: Array, max_t: Array) -> Array:
         N = direction.shape[-1]

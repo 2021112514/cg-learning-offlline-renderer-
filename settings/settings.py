@@ -23,9 +23,16 @@ class Render:
 
 @dataclass
 @tag()
+class Resources:
+    texture: str
+
+
+@dataclass
+@tag()
 class Settings:
     screen: Screen
     render: Render
+    resources: Resources
 
 
 def get_settings(path: str) -> Settings:

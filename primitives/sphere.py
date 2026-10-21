@@ -16,7 +16,7 @@ class Sphere(Primitive):
         self.r = radius
         self.pdf = np.array([1 / (4 * np.pi * self.r ** 2)], dtype=np.float32)
 
-    def _intersect(self, direction: Array, source: Array, min_t: Array, max_t: Array) -> Tuple[Array, Array, Array]:
+    def _intersect(self, direction: Array, source: Array, min_t: Array, max_t: Array) -> Tuple[Array, Array, Array, Array]:
         N = direction.shape[-1]
         # A = direction ** 2, direction已归一化
         B = 2 * (source * direction).sum(axis=0) # [N]
@@ -34,7 +34,12 @@ class Sphere(Primitive):
         # 不能直接返回pos，否则Shape中会对同一个ndarray进行变换
         n = np.full((3, N), np.inf, dtype=np.float32)
         n[:, not_inf] = pos[:, not_inf]
-        return t, pos, n
+        uv = np.zeros((2, N), dtype=np.float32)
+        u = np.arctan2(pos[1, not_inf], pos[0, not_inf]) / (2 * np.pi)
+        u[u < 0] += 1
+        uv[0, not_inf] = u
+        uv[1, not_inf] = np.arccos(np.clip(pos[2, not_inf] / self.r, a_min=-1, a_max=1))
+        return t, pos, n, uv
 
     def _intersect_shadow_ray(self, direction: Array, source: Array, min_t: Array, max_t: Array) -> Array:
         # A = direction ** 2, direction已归一化

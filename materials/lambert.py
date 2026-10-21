@@ -1,16 +1,16 @@
 from device import np, Array, random_float32
-from typing import Tuple
+from typing import Tuple, Optional
 from .material import Material
 from parser import tag
 
 
 @tag()
 class Lambert(Material):
-    def __init__(self, albedo: Tuple[float, float, float], name: str):
-        super().__init__(name)
+    def __init__(self, albedo: Tuple[float, float, float], name: str, albedo_map: Optional[str] = None):
+        super().__init__(name, albedo_map)
         self.albedo = np.array([albedo], dtype=np.float32).T
 
-    def brdf(self, wo: Array, wi: Array) -> Array:
+    def _brdf(self, wo: Array, wi: Array) -> Array:
         return np.broadcast_to(self.albedo / np.pi, wo.shape)
 
     def sample_wi(self, wo: Array) -> Tuple[Array, Array]:

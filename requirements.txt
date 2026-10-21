@@ -1,4 +1,5 @@
 cupy_cuda12x==14.2.0
 numpy==2.5.4
+Pillow==13.0.0
 pygame==2.6.1
 tqdm==4.70.1

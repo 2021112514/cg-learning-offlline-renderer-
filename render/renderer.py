@@ -70,7 +70,7 @@ class Renderer:
         if ray.direction.shape[-1] == 0:
             return np.zeros_like(ray.direction)
         color = np.zeros_like(ray.direction)
-        t, pos, n, object_index = self.scene.intersect(ray)
+        t, pos, n, uv, object_index = self.scene.intersect(ray)
         N = t.shape[0]
         not_inf = t < np.inf
         # 自发光
@@ -99,6 +99,7 @@ class Renderer:
         # 暂不考虑具有各向异性的材质（建系时不能仅指定法线）
         wo_local = (coord_transform_not_inf.transpose((1, 2, 0)) * -ray.direction[None, :, selected]).sum(axis=1) # [3, N_selected]
         pos_selected = pos[:, selected]
+        uv_selected = uv[:, selected]
         min_t = np.array([EPSILON], dtype=np.float32)
         max_t_inf = np.full_like(min_t, np.inf)
         object_index_selected = object_index[selected]
@@ -132,7 +133,11 @@ class Renderer:
             for material_id in range(num_material):
                 material = self.scene.materials[material_id]
                 mask = material_index_not_blocked == material_id
-                brdf[:, mask] = material.brdf(wo_local[:, not_specular][:, not_blocked][:, mask], wi_local[:, not_blocked][:, mask])
+                brdf[:, mask] = material.brdf(
+                    wo_local[:, not_specular][:, not_blocked][:, mask],
+                    wi_local[:, not_blocked][:, mask],
+                    uv_selected[:, not_specular][:, not_blocked][:, mask]
+                )
             color[:, not_blocked_global] += radiance[:, not_blocked] * np.clip(cos[not_blocked], a_min=0.0, a_max=None) * brdf / pdf[not_blocked]
         if depth == self.settings.render.max_reflection_time:
             return color / factor + emissive if emissive is not None else color / factor
@@ -150,7 +155,7 @@ class Renderer:
                     sampled_wi, sampled_pdf = material.sample_wi(wo_local[:, not_specular][:, mask])
                     wi[:, mask] = sampled_wi
                     pdf[mask] = sampled_pdf
-                    brdf[:, mask] = material.brdf(wo_local[:, not_specular][:, mask], wi[:, mask])
+                    brdf[:, mask] = material.brdf(wo_local[:, not_specular][:, mask], wi[:, mask], uv_selected[:, not_specular][:, mask])
             direction_wi_global = (coord_transform_inv[not_specular, :, :].transpose((1, 2, 0)) * wi).sum(axis=1)
             ray = Ray(
                 direction=direction_wi_global,
@@ -167,7 +172,7 @@ class Renderer:
         for material_id in range(num_material):
             material = self.scene.materials[material_id]
             mask = material_index_specular == material_id
-            brdf[:, mask] = material.brdf(wo_local[:, is_specular][:, mask], wi[:, mask])
+            brdf[:, mask] = material.brdf(wo_local[:, is_specular][:, mask], wi[:, mask], uv_selected[:, is_specular][:, mask])
         direction_wi_global = np.sum(coord_transform_inv[is_specular, :, :].transpose((1, 2, 0)) * wi, axis=1)
         ray = Ray(
             direction=direction_wi_global,

@@ -1,18 +1,18 @@
-from typing import Tuple
+from typing import Tuple, Optional
 from device import np, Array, random_float32
 from .material import Material
 from parser import tag
 
 @tag()
 class OrenNayar(Material):
-    def __init__(self, name: str, albedo: Tuple[float, float, float], sigma: float):
-        super().__init__(name)
+    def __init__(self, name: str, albedo: Tuple[float, float, float], sigma: float, albedo_map: Optional[str]):
+        super().__init__(name, albedo_map)
         self.albedo = np.array([albedo], dtype=np.float32).T
         sigma2 = sigma ** 2
         self.A = 1 - (sigma2 / (2 * sigma2 + 0.33))
         self.B = 0.45 * sigma2 / (sigma2 + 0.09)
 
-    def brdf(self, wo: Array, wi: Array) -> Array:
+    def _brdf(self, wo: Array, wi: Array) -> Array:
         cos_theta_i = wi[2, :]
         sin_theta_i = np.sqrt(1 - cos_theta_i ** 2)
         cos_phi_i = wi[0, :] / np.clip(sin_theta_i, a_min=1e-6, a_max=None)

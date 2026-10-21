@@ -19,7 +19,7 @@ class Disk(Primitive):
         self.r = r
         self.pdf = np.array([1 / (np.pi * self.r ** 2)], dtype=np.float32)
 
-    def _intersect(self, direction: Array, source: Array, min_t: Array, max_t: Array) -> Tuple[Array, Array, Array]:
+    def _intersect(self, direction: Array, source: Array, min_t: Array, max_t: Array) -> Tuple[Array, Array, Array, Array]:
         N = direction.shape[-1]
         d_z_neq_0 = np.abs(direction[2, :]) > 1e-8
         t = np.full(N, np.inf, dtype=np.float32)
@@ -35,7 +35,12 @@ class Disk(Primitive):
         pos = np.where(in_disk, pos, np.inf)
         n = np.array([[0.], [0.], [1.]], dtype=np.float32).repeat(N, axis=-1)
         n = np.where(in_disk, n, np.inf)
-        return t, pos, n
+        uv = np.zeros((2, N), dtype=np.float32)
+        u = np.arctan2(pos[1, not_inf], pos[0, not_inf]) / (2 * np.pi)
+        u[u < 0] += 1
+        uv[0, not_inf] = u
+        uv[1, not_inf] = np.sqrt(dis2[not_inf]) / self.r
+        return t, pos, n, uv
 
     def _intersect_shadow_ray(self, direction: Array, source: Array, min_t: Array, max_t: Array) -> Array:
         N = direction.shape[-1]

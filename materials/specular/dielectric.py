@@ -1,4 +1,4 @@
-from typing import Tuple
+from typing import Tuple, Optional
 from .specular import Specular
 from common import get_refractor_vector
 from parser import tag
@@ -7,12 +7,12 @@ from device import np, Array
 
 @tag()
 class DielectricSpecular(Specular):
-    def __init__(self, name: str, eta: float, transmission_color: Tuple[float, float, float]):
-        super().__init__(name)
+    def __init__(self, name: str, eta: float, transmission_color: Tuple[float, float, float], albedo_map: Optional[str] = None):
+        super().__init__(name, albedo_map)
         self.eta = np.float32(eta)
         self.transmission_color = np.array([transmission_color], dtype=np.float32).T
 
-    def brdf(self, wo: Array, wi: Array) -> Array:
+    def _brdf(self, wo: Array, wi: Array) -> Array:
         symm: Array = np.sum(np.abs(wo + wi * np.array([[1.], [1.], [-1.]], dtype=np.float32)) < 1e-6, axis=0) == 3
         cos_i = np.abs(wi[-1, symm])
         eta_i_div_eta_t = np.where(wi[-1, symm] > 0, 1 / self.eta, self.eta)
