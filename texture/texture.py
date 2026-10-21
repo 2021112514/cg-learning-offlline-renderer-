@@ -33,16 +33,16 @@ class Texture:
         # wrap
         uv = uv - np.array(uv, dtype=np.int32)
         uv[uv < 0] += 1
-        x, y = uv * np.array([[W], [H]], dtype=np.float32)
-        x_int = np.floor(x - 0.5, dtype=np.uint32)
-        y_int = np.floor(y - 0.5, dtype=np.uint32)
-        k1 = (x - x_int - 0.5)[:, None]
-        k2 = (y - y_int - 0.5)[:, None]
-        x_int_1 = np.clip(x_int + 1, a_min=None, a_max=W - 1)
-        y_int_1 = np.clip(y_int + 1, a_min=None, a_max=H - 1)
-        x_int = np.clip(x_int, a_min=0, a_max=None)
-        y_int = np.clip(y_int, a_min=0, a_max=None)
-        c1 = self.image[y_int, x_int] * k1 + self.image[y_int, x_int_1] * (1 - k1)
-        c2 = self.image[y_int_1, x_int] * k1 + self.image[y_int_1, x_int_1] * (1 - k1)
-        ret = (c1 * k2 + c2 * (1 - k2)) / 255
+        x, y = uv * np.array([[W], [H]], dtype=np.float32) - 0.5
+        x_int = np.floor(x, dtype=np.int32)
+        y_int = np.floor(y, dtype=np.int32)
+        k1 = (x - x_int)[:, None]
+        k2 = (y - y_int)[:, None]
+        x_int_1 = x_int + 1 % W
+        y_int_1 = y_int + 1 % H
+        x_int = x_int % W
+        y_int = y_int % H
+        c1 = self.image[y_int, x_int] * (1 - k1) + self.image[y_int, x_int_1] * k1
+        c2 = self.image[y_int_1, x_int] * (1 - k1) + self.image[y_int_1, x_int_1] * k1
+        ret = (c1 * (1 - k2) + c2 * k2) / 255
         return ret.T

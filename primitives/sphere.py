@@ -38,7 +38,7 @@ class Sphere(Primitive):
         u = np.arctan2(pos[1, not_inf], pos[0, not_inf]) / (2 * np.pi)
         u[u < 0] += 1
         uv[0, not_inf] = u
-        uv[1, not_inf] = np.arccos(np.clip(pos[2, not_inf] / self.r, a_min=-1, a_max=1))
+        uv[1, not_inf] = np.arccos(np.clip(pos[2, not_inf] / self.r, a_min=-1, a_max=1)) / np.pi
         return t, pos, n, uv
 
     def _intersect_shadow_ray(self, direction: Array, source: Array, min_t: Array, max_t: Array) -> Array:

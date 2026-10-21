@@ -9,7 +9,7 @@ class OrenNayar(Material):
         super().__init__(name, albedo_map)
         self.albedo = np.array([albedo], dtype=np.float32).T
         sigma2 = sigma ** 2
-        self.A = 1 - (sigma2 / (2 * sigma2 + 0.33))
+        self.A = 1 - (sigma2 / 2 * (sigma2 + 0.33))
         self.B = 0.45 * sigma2 / (sigma2 + 0.09)
 
     def _brdf(self, wo: Array, wi: Array) -> Array:
