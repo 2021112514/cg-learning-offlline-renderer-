@@ -20,3 +20,5 @@ python -m run --scene '<scene>' --config '<config>'
 ![](./assets/scene14.png)
 ### 纹理
 ![](./assets/scene16_2.png)
+### 法线贴图
+![](./assets/scene17.png)
