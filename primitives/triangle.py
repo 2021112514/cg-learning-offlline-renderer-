@@ -25,9 +25,9 @@ class Triangle(Primitive):
         self.pdf = 2 / np.sqrt((self.n ** 2).sum())
         du1, dv1 = self.uv1 - self.uv0
         du2, dv2 = self.uv2 - self.uv0
-        self.tangent = (dv2 * self.e1 - dv1 * self.e2) / (du1 * dv2 - du2 * dv1)
+        self.tangent = (dv2 * self.e1 - dv1 * self.e2) / np.clip((du1 * dv2 - du2 * dv1), a_min=1e-4, a_max=None)
 
-    def _intersect(self, direction: Array, source: Array, min_t: Array, max_t: Array) -> Tuple[Array, Array, Array, Array, Array]:
+    def _intersect(self, direction: Array, source: Array, min_t: Array, max_t: Array) -> Tuple[Array, Array, Array, Array, Array | None]:
         N = direction.shape[-1]
         s = source - self.p0 # [3, N]
         s1 = np.cross(direction, self.e2, axis=0) # [3, N]

@@ -98,7 +98,8 @@ class Renderer:
         n_selected = n[:, selected]
         pos_selected = pos[:, selected]
         uv_seleced = uv[:, selected]
-        coord_transform, coord_transform_inv = build_coordinate_system(n_selected, tangent[:, selected]) # [N_selected, 3, 3]
+        # [N_selected, 3, 3]
+        coord_transform, coord_transform_inv = build_coordinate_system(n_selected, tangent[:, selected] if tangent is not None else None)
         # 以法线为z轴的坐标系中，出射光线的方向，用于计算BRDF
         wo_local = (coord_transform.transpose((1, 2, 0)) * -ray.direction[None, :, selected]).sum(axis=1) # [3, N_selected]
         min_t = np.array([EPSILON], dtype=np.float32)
@@ -118,6 +119,7 @@ class Renderer:
         wo_local_not_specular = wo_local[:, idx_not_specular_in_selected]
         uv_not_specular = uv_seleced[:, not_specular]
         uv_specular = uv_seleced[:, is_specular]
+        n_not_specular = n_selected[:, not_specular]
         for light in self.scene.lights:
             radiance, source, max_t, pdf = light.get_radiance(pos_not_specular) # [3, N_not_specular]
             shadow_ray_direction = normalize(source - pos_not_specular)
@@ -130,7 +132,7 @@ class Renderer:
             t_ = self.scene.intersect_shadow_ray(shadow_ray)
             not_blocked = t_ == np.inf # [N_not_specular]
             idx_not_blocked = idx_selected_not_secular[not_blocked]
-            cos = (n_selected[:, not_blocked] * normalize(source[:, not_blocked] - pos_selected[:, not_blocked])).sum(axis=0) # [N_not_blocked]
+            cos = (n_not_specular[:, not_blocked] * normalize(source[:, not_blocked] - pos_not_specular[:, not_blocked])).sum(axis=0) # [N_not_blocked]
             # 以法线为z轴的坐标系中，入射光线的方向，用于计算BRDF
             wi_local = (coord_transform_not_specular.transpose((1, 2, 0)) * shadow_ray_direction[None, :, :]).sum(axis=1)
             brdf = np.full((3, int(not_blocked.sum())), 0.0, dtype=np.float32)

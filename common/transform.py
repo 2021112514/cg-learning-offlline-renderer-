@@ -26,7 +26,7 @@ def normalize(x: Array) -> Array:
     Args:
         x(Array): [3, N]
     """
-    return x / np.sqrt((x ** 2).sum(axis=0, keepdims=True))
+    return x / np.clip(np.sqrt((x ** 2).sum(axis=0, keepdims=True)), a_min=1e-4, a_max=None)
 
 
 def normalize_homogeneous(x: Array) -> Array:
@@ -227,11 +227,17 @@ def build_coordinate_system(z: Array, t: Optional[Array] = None) -> Tuple[Array,
     """
     if t is None:
         t = np.array([[1.], [0.], [0.]], dtype=np.float32)
-        t = np.where(np.abs((t * z).sum(axis=0, keepdims=True)) >= 1.0 - 1e-6,  np.array([[0.], [1.], [0.]], dtype=np.float32), t)
+        t = np.where(np.abs((t * z).sum(axis=0, keepdims=True)) >= 1.0 - 1e-4,  np.array([[0.], [1.], [0.]], dtype=np.float32), t)
         b = normalize(np.cross(z, t, axis=0))
         t = normalize(np.cross(b, z, axis=0))
     else:
         b = np.cross(z, t, axis=0)
+        invalid = (b ** 2).sum(axis=0) < 1e-4
+        if np.any(invalid):
+            t[:, invalid] = np.array([[1.], [0.], [0.]], dtype=np.float32)
+            t = np.where(np.abs((t * z).sum(axis=0, keepdims=True)) >= 1.0 - 1e-4,  np.array([[0.], [1.], [0.]], dtype=np.float32), t)
+            b = normalize(np.cross(z, t, axis=0))
+            t = normalize(np.cross(b, z, axis=0))
     inv = np.stack([t, b, z], axis=1).transpose((2, 0, 1))
     matrix = inv.transpose((0, 2, 1))
     return matrix, inv

@@ -26,7 +26,6 @@ class TorranceSparrow(Material):
 
     def _brdf(self, wo: Array, wi: Array) -> Array:
         valid = np.logical_and(wo[2, :] > EPSILON, wi[2, :] > EPSILON)
-        valid = np.full(wo.shape[-1], True, dtype=bool)
         brdf = np.zeros_like(wo)
         wi_valid = wi[:, valid]
         wo_valid = wo[:, valid]
