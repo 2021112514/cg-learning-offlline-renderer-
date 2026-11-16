@@ -19,6 +19,7 @@ class Render:
     max_reflection_time: int = 2
     reflection_probably: float = 0.8
     split: int = 1
+    depth_layers: int = 4
 
 
 @dataclass

@@ -10,6 +10,7 @@
         <MaxReflectionTime>4</MaxReflectionTime>
         <ReflectionProbably>0.8</ReflectionProbably>
         <Split>64</Split>
+        <DepthLayers>6</DepthLayers>
     </Render>
     <Resources>
         <Texture>

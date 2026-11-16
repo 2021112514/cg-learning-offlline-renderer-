@@ -10,11 +10,13 @@ class OrenNayar(Material):
         name: str,
         albedo: Tuple[float, float, float],
         sigma: float,
-        albedo_map: Optional[str],
-        normal_map: Optional[str],
-        bump_scale: float = 1
+        albedo_map: Optional[str] = None,
+        normal_map: Optional[str] = None,
+        bump_scale: float = 1,
+        depth_map: Optional[str] = None,
+        max_depth: float = 1.0
     ):
-        super().__init__(name, albedo_map, normal_map, bump_scale)
+        super().__init__(name, albedo_map, normal_map, bump_scale, depth_map, max_depth)
         self.albedo = np.array([albedo], dtype=np.float32).T
         sigma2 = sigma ** 2
         self.A = 1 - (sigma2 / (2 * (sigma2 + 0.33)))

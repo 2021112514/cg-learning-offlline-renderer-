@@ -14,9 +14,11 @@ class DielectricSpecular(Specular):
         transmission_color: Tuple[float, float, float],
         albedo_map: Optional[str] = None,
         normal_map: Optional[str] = None,
-        bump_scale: float = 1
+        bump_scale: float = 1,
+        depth_map: Optional[str] = None,
+        max_depth: float = 1.0
     ):
-        super().__init__(name, albedo_map, normal_map, bump_scale)
+        super().__init__(name, albedo_map, normal_map, bump_scale, depth_map, max_depth)
         self.eta = np.float32(eta)
         self.transmission_color = np.array([transmission_color], dtype=np.float32).T
 

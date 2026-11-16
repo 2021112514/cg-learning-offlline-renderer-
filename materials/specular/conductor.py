@@ -14,9 +14,11 @@ class ConductorSpecular(Specular):
         reflection_color: Tuple[float, float, float] = (1.0, 1.0, 1.0),
         albedo_map: Optional[str] = None,
         normal_map: Optional[str] = None,
-        bump_scale: float = 1
+        bump_scale: float = 1,
+        depth_map: Optional[str] = None,
+        max_depth: float = 1.0
     ):
-        super().__init__(name, albedo_map, normal_map, bump_scale)
+        super().__init__(name, albedo_map, normal_map, bump_scale, depth_map, max_depth)
         self.eta = np.array([eta], dtype=np.float32).T
         self.reflection_color = np.array([reflection_color], dtype=np.float32).T
         self.k = self.eta ** 2 + np.array([absorption_coef], dtype=np.float32).T ** 2
