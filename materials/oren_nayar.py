@@ -22,7 +22,7 @@ class OrenNayar(Material):
         self.A = 1 - (sigma2 / (2 * (sigma2 + 0.33)))
         self.B = 0.45 * sigma2 / (sigma2 + 0.09)
 
-    def _brdf(self, wo: Array, wi: Array) -> Array:
+    def _brdf(self, wo: Array, wi: Array, uv: Array) -> Array:
         cos_theta_i = wi[2, :]
         sin_theta_i = np.sqrt(1 - cos_theta_i ** 2)
         cos_phi_i = wi[0, :] / np.clip(sin_theta_i, a_min=1e-6, a_max=None)
@@ -38,7 +38,7 @@ class OrenNayar(Material):
         cos_delta_phi = cos_phi_i * cos_phi_o + sin_phi_i * sin_phi_o
         return self.albedo * (self.A + self.B * np.clip(cos_delta_phi, a_min=0.0, a_max=None) * sin_alpha * tan_beta) / np.pi
 
-    def sample_wi(self, wo: Array) -> Tuple[Array, Array]:
+    def sample_wi(self, wo: Array, uv: Array) -> Tuple[Array, Array]:
         N = wo.shape[-1]
         e1 = random_float32(N)
         e2 = random_float32(N)

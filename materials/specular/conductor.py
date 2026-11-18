@@ -23,7 +23,7 @@ class ConductorSpecular(Specular):
         self.reflection_color = np.array([reflection_color], dtype=np.float32).T
         self.k = self.eta ** 2 + np.array([absorption_coef], dtype=np.float32).T ** 2
 
-    def _brdf(self, wo: Array, wi: Array) -> Array:
+    def _brdf(self, wo: Array, wi: Array, uv: Array) -> Array:
         symm = np.sum(np.abs(wo + wi * np.array([[1.], [1.], [-1.]], dtype=np.float32)) < 1e-6, axis=0) == 3
         cos = wi[2, symm]
         cos2 = cos ** 2

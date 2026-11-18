@@ -14,7 +14,7 @@ class Material:
         max_depth: float = 1.0
     ):
         self.name = name
-        self.texture = Texture(texture) if texture is not None else None
+        self.albedo_map = Texture(texture) if texture is not None else None
         self.normal_map = Texture(normal_map) if normal_map is not None else None
         self.depth_map = Texture(depth_map, mode='L') if depth_map is not None else None
         self.bump_scale = bump_scale
@@ -52,12 +52,15 @@ class Material:
                 q_b[:, mask_b] = uv_[:, mask_b]
             t = -f_a / np.clip(f_b - f_a, a_min=None, a_max=-1e-4)
             uv = (1 - t) * q_a + t * q_b
-        brdf = self._brdf(wo, wi)
-        if self.texture is not None:
-            brdf = brdf * self.texture.sample(uv)
+        brdf = self._brdf(wo, wi, uv)
+        return self.process_albedo_map(uv, brdf)
+
+    def process_albedo_map(self, uv: Array, brdf: Array) -> Array:
+        if self.albedo_map is not None:
+            return brdf * self.albedo_map.sample(uv)
         return brdf
 
-    def _brdf(self, wo: Array, wi: Array) -> Array:
+    def _brdf(self, wo: Array, wi: Array, uv: Array) -> Array:
         """
         Args:
             wo(Array): [3, N]，**局部坐标系下**出射方向向量
@@ -65,13 +68,13 @@ class Material:
         """
         raise NotImplementedError()
 
-    def sample_wi(self, wo: Array) -> Tuple[Array, Array]:
+    def sample_wi(self, wo: Array, uv: Array) -> Tuple[Array, Array]:
         """
         按重要性采样算法采样入射方向，用于计算 Monte Carlo 积分
         Args:
             wo(Array): [3, N]，**局部坐标系下**出射方向向量
         Returns:
             wi(Array): [3, N]，**局部坐标系下**采样的入射方向
-            pdf(Array): [N]，采样处的概率密度函数
+            pdf(Array): [N]，采样处的概率密度函数，**特别地，pdf=0表示采样失败，求解 Monte Carlo 积分时应将对应的共享记为0**
         """
         raise NotImplementedError()

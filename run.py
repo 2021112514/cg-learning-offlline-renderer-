@@ -13,6 +13,9 @@ scene_xml: str = args.scene
 conf = args.config
 settings = get_settings(conf)
 if __name__ == '__main__':
+    from device import np
+    if settings.render.seed is not None:
+        np.random.seed(settings.render.seed)
     scene = Scene.from_xml(scene_xml)
     W, H = scene.camera.W, scene.camera.H
     window = PygameWindow(W, H, scene_xml.split('\\')[-1].split('/')[-1].removesuffix('.xml'))

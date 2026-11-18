@@ -26,7 +26,7 @@ class TorranceSparrow(Material):
         self.k = self.eta ** 2 + np.array([absorption_coef], dtype=np.float32).T ** 2
         self.e = exponent
 
-    def _brdf(self, wo: Array, wi: Array) -> Array:
+    def _brdf(self, wo: Array, wi: Array, uv: Array) -> Array:
         valid = np.logical_and(wo[2, :] > EPSILON, wi[2, :] > EPSILON)
         brdf = np.zeros_like(wo)
         wi_valid = wi[:, valid]
@@ -46,7 +46,7 @@ class TorranceSparrow(Material):
         brdf[:, valid] = self.reflection_color * D * G * F / (4 * wo_valid[2, :] * wi_valid[2, :])
         return brdf
 
-    def sample_wi(self, wo: Array) -> Tuple[Array, Array]:
+    def sample_wi(self, wo: Array, uv: Array) -> Tuple[Array, Array]:
         N = wo.shape[-1]
         e1 = random_float32(N)
         e2 = random_float32(N)
@@ -56,5 +56,5 @@ class TorranceSparrow(Material):
         wh = np.stack([sin_theta_h * np.cos(phi_h), sin_theta_h * np.sin(phi_h), cos_theta_h], axis=0)
         wi = 2 * np.sum(wo * wh, axis=0) * wh - wo
         pdf_wh = (self.e + 1) * (cos_theta_h ** self.e) / (2 * np.pi)
-        pdf = pdf_wh / np.clip(4 * np.sum(wo * wh, axis=0), a_min=EPSILON, a_max=None)
+        pdf = pdf_wh / np.clip(4 * np.abs(np.sum(wo * wh, axis=0)), a_min=EPSILON, a_max=None)
         return wi, pdf

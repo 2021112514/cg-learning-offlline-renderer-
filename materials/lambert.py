@@ -19,10 +19,10 @@ class Lambert(Material):
         super().__init__(name, albedo_map, normal_map, bump_scale, depth_map, max_depth)
         self.albedo = np.array([albedo], dtype=np.float32).T
 
-    def _brdf(self, wo: Array, wi: Array) -> Array:
+    def _brdf(self, wo: Array, wi: Array, uv: Array) -> Array:
         return np.broadcast_to(self.albedo / np.pi, wo.shape)
 
-    def sample_wi(self, wo: Array) -> Tuple[Array, Array]:
+    def sample_wi(self, wo: Array, uv: Array) -> Tuple[Array, Array]:
         N = wo.shape[-1]
         e1 = random_float32(N)
         e2 = random_float32(N)

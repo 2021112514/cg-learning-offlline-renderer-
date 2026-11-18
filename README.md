@@ -22,3 +22,5 @@ python -m run --scene '<scene>' --config '<config>'
 ![](./assets/scene16_2.png)
 ### 法线贴图
 ![](./assets/scene17.png)
+### Cook-Torrance
+![](./assets/scene18.png)

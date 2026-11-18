@@ -13,6 +13,7 @@ class Screen:
 @dataclass
 @tag()
 class Render:
+    seed: int | None = None
     ssaa_sampling_times: int = 0
     monte_carlo_integration_sampling_times: int = 8
     min_reflection_time: int = 1

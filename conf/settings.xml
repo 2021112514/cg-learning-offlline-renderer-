@@ -4,6 +4,7 @@
         <H>460</H>
     </Screen>
     <Render>
+        <Seed>42</Seed>
         <SSAASamplingTimes>512</SSAASamplingTimes>
         <MonteCarloIntegrationSamplingTimes>1</MonteCarloIntegrationSamplingTimes>
         <MinReflectionTime>2</MinReflectionTime>

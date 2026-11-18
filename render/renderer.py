@@ -154,7 +154,8 @@ class Renderer:
                     shader_normal = normalize(material.bump_scale * (2 * normal_color - 1) +\
                         (1 - material.bump_scale) * np.array([[0], [0], [1]], dtype=np.float32))
                     cos[mask] = np.sum(wi_material * shader_normal, axis=0)
-            color[:, idx_not_blocked] += radiance[:, not_blocked] * np.clip(cos, a_min=0.0, a_max=None) * brdf / pdf[not_blocked]
+            color[:, idx_not_blocked] += radiance[:, not_blocked] * np.clip(cos, a_min=0.0, a_max=None) * brdf * (pdf[not_blocked] > 0.0) \
+                / np.clip(pdf[not_blocked], a_min=EPSILON, a_max=None)
         if depth == self.settings.render.max_reflection_time:
             return color / factor + emissive if emissive is not None else color / factor
         # 间接光照
@@ -169,7 +170,7 @@ class Renderer:
                 material = self.scene.materials[material_id]
                 mask = material_index_not_specular == material_id
                 if int(np.sum(mask)) > 0:
-                    sampled_wi, sampled_pdf = material.sample_wi(wo_local_not_specular[:, mask])
+                    sampled_wi, sampled_pdf = material.sample_wi(wo_local_not_specular[:, mask], uv_not_specular[:, mask])
                     wi[:, mask] = sampled_wi
                     cos[mask] = sampled_wi[-1]
                     pdf[mask] = sampled_pdf
@@ -186,7 +187,10 @@ class Renderer:
                 min_t=np.broadcast_to(min_t, N_not_specular),
                 max_t=np.broadcast_to(max_t_inf, N_not_specular)
             )
-            color_ = brdf * self._compute_radiance(ray, depth + 1, include_emissive=False) * np.clip(cos, a_min=0.0, a_max=None) / pdf
+            # pdf=0表示采样失败，不应计算其贡献
+            # 采样失败一般意味着渲染方程中的max(0, n * wi)=0，主要在对半程向量的采样中出现
+            color_ = brdf * self._compute_radiance(ray, depth + 1, include_emissive=False) * np.clip(cos, a_min=0.0, a_max=None) * (pdf > 0.0) \
+                / np.clip(pdf, a_min=EPSILON, a_max=None)
             color_sum += color_
         color[:, idx_selected[not_specular]] += color_sum / self.settings.render.monte_carlo_integration_sampling_times
         idx_selected_specular = idx_selected[is_specular]
